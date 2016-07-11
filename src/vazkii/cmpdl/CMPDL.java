@@ -213,8 +213,9 @@ public final class CMPDL {
 		}
 	}
 
-	public static File getOutputDir(String filename) throws IOException {
-		String homePath = new File(".").getAbsolutePath();
+	public static File getOutputDir(String filename) throws IOException, URISyntaxException {
+		File jarFile = new File(CMPDL.class.getProtectionDomain().getCodeSource().getLocation().toURI());
+		String homePath = jarFile.getParentFile().getAbsolutePath();
 
 		String outname = URLDecoder.decode(filename, "UTF-8");
 		outname = outname.replaceAll(".zip", "");
