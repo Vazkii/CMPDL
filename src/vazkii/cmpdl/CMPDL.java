@@ -277,6 +277,9 @@ public final class CMPDL {
 			if(redirectLocation == null) 
 				break;
 
+			redirectLocation = redirectLocation.replaceAll("\\[", "%5B");
+			redirectLocation = redirectLocation.replaceAll("\\]", "%5D");
+			
 			if(redirectLocation.startsWith("/"))
 				uri = new URI(uri.getScheme(), uri.getHost(), redirectLocation, uri.getFragment());
 			else uri = new URI(redirectLocation);
