@@ -34,15 +34,18 @@ public final class CMPDL {
 	public static void main(String[] args) {
 		if(args.length > 0) {
 			String url = args[0];
+			String version = "latest";
+			if (args.length > 1)
+				version = args[1];
 			try {
-				downloadFromURL(url);
+				downloadFromURL(url, version);
 			} catch(Exception e) {
 				throw new RuntimeException(e);
 			}
 		} else Interface.openInterface();
 	}
 
-	public static void downloadFromURL(String url) throws Exception {
+	public static void downloadFromURL(String url, String version) throws Exception {
 		if(downloading)
 			return;
 
@@ -54,7 +57,16 @@ public final class CMPDL {
 		if(packUrl.endsWith("/"))
 			packUrl = packUrl.replaceAll(".$", "");
 
-		String fileUrl = packUrl + "/files/latest";
+		String packVersion = version;
+		if(version == null || version.isEmpty())
+			packVersion = "latest";
+
+		String fileUrl;
+		if (packVersion == "latest")
+			fileUrl = packUrl + "/files/latest";
+		else
+			fileUrl = packUrl + "/files/" + packVersion + "/download";
+
 		String finalUrl = getLocationHeader(fileUrl);
 		log("URLs: " + fileUrl + " " + finalUrl);
 		Matcher matcher = FILE_NAME_URL_PATTERN.matcher(finalUrl);
@@ -108,7 +120,7 @@ public final class CMPDL {
 
 		String zipName = filename;
 		if(!zipName.endsWith(".zip"))
-			zipName = zipName + ".zip";		
+			zipName = zipName + ".zip";
 
 		String retPath = retDir.getAbsolutePath();
 		retDir.deleteOnExit();
@@ -166,7 +178,7 @@ public final class CMPDL {
 		int left = total;
 		for(Manifest.FileData f : manifest.files) {
 			left--;
-			downloadFile(f, modsDir, left, total); 
+			downloadFile(f, modsDir, left, total);
 		}
 
 		log("Mod downloads complete");
@@ -275,12 +287,12 @@ public final class CMPDL {
 			connection = (HttpURLConnection) url.openConnection();
 			connection.setInstanceFollowRedirects(false);
 			String redirectLocation = connection.getHeaderField("Location");
-			if(redirectLocation == null) 
+			if(redirectLocation == null)
 				break;
 
 			redirectLocation = redirectLocation.replaceAll("\\[", "%5B");
 			redirectLocation = redirectLocation.replaceAll("\\]", "%5D");
-			
+
 			if(redirectLocation.startsWith("/"))
 				uri = new URI(uri.getScheme(), uri.getHost(), redirectLocation, uri.getFragment());
 			else uri = new URI(redirectLocation);
@@ -304,7 +316,7 @@ public final class CMPDL {
 
 	public static void log(String s) {
 		Interface.addLogLine(s);
-		System.out.println(s); 
+		System.out.println(s);
 	}
 
 	private CMPDL() {}

@@ -46,9 +46,11 @@ public class Interface {
 
 		JPanel panel;
 		JButton downloadButton;
-		JLabel label;
+		JLabel urlLabel;
+		JLabel versionLabel;
 		JScrollPane scrollPane;
 		JTextField urlField;
+		JTextField versionField;
 		JTextArea logArea;
 		JLabel currentStatus;
 
@@ -58,8 +60,10 @@ public class Interface {
 
 			panel = new JPanel();
 			downloadButton = new JButton("Download");
-			label = new JLabel("Modpack URL");
+			urlLabel = new JLabel("Modpack URL");
 			urlField = new JTextField("", 54);
+			versionLabel = new JLabel("Curse File ID");
+			versionField = new JTextField("latest", 54);
 
 			logArea = new JTextArea(34, 68);
 			logArea.setBackground(Color.WHITE);
@@ -71,8 +75,10 @@ public class Interface {
 
 			currentStatus = new JLabel("Idle", SwingConstants.LEFT);
 
-			panel.add(label);
+			panel.add(urlLabel);
 			panel.add(urlField);
+			panel.add(versionLabel);
+			panel.add(versionField);
 			panel.add(downloadButton);
 			panel.add(scrollPane);
 			panel.add(currentStatus);
@@ -81,6 +87,7 @@ public class Interface {
 			downloadButton.requestFocus();
 			downloadButton.addActionListener(this);
 			urlField.addKeyListener(this);
+			versionField.addKeyListener(this);
 
 			addWindowListener(new WindowAdapter() {
 				@Override
@@ -108,11 +115,12 @@ public class Interface {
 		@Override
 		public void actionPerformed(ActionEvent e) {
 			String url = urlField.getText();
+			String version = versionField.getText();
 			if(url != null && !url.isEmpty() && !CMPDL.downloading)
-				operatorThread = new OperatorThread(url);
+				operatorThread = new OperatorThread(url, version);
 		}
 
-		@Override public void keyPressed(KeyEvent e) {  }
+		@Override public void keyPressed(KeyEvent e) {	}
 		@Override public void keyReleased(KeyEvent e) { }
 	}
 
