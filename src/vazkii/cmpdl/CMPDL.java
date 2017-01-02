@@ -54,7 +54,18 @@ public final class CMPDL {
 		if(packUrl.endsWith("/"))
 			packUrl = packUrl.replaceAll(".$", "");
 
-		String fileUrl = packUrl + "/files/latest";
+		String fileSuffix = "/files/latest";
+		if(packUrl.contains("/files/")) {
+			int splitIdx = packUrl.indexOf("/files/");
+			fileSuffix = packUrl.substring(splitIdx);
+			packUrl = packUrl.substring(0, splitIdx);
+		}
+
+		if(!fileSuffix.endsWith("/latest")) {
+			fileSuffix += "/download";
+		}
+
+		String fileUrl = packUrl + fileSuffix;
 		String finalUrl = getLocationHeader(fileUrl);
 		log("URLs: " + fileUrl + " " + finalUrl);
 		Matcher matcher = FILE_NAME_URL_PATTERN.matcher(finalUrl);
