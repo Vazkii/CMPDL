@@ -15,6 +15,8 @@ import java.net.URL;
 import java.net.URLDecoder;
 import java.nio.file.Files;
 import java.nio.file.Paths;
+import java.util.ArrayList;
+import java.util.List;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
@@ -30,6 +32,8 @@ public final class CMPDL {
 	public static final Pattern FILE_NAME_URL_PATTERN = Pattern.compile(".*?/([^/]*)$");
 
 	public static boolean downloading = false;
+
+	private static List<String> missingMods = null;
 
 	public static void main(String[] args) {
 		if(args.length > 0) {
@@ -49,6 +53,7 @@ public final class CMPDL {
 		if(downloading)
 			return;
 
+		missingMods = new ArrayList<String>();
 		downloading = true;
 		log("~ Starting magical modpack download sequence ~");
 		Interface.setStatus("Starting up");
@@ -97,6 +102,12 @@ public final class CMPDL {
 			log("A later version will probably also work just as fine, but this is the version shipped with the pack");
 			log("This is also added to the instance notes");
 			log("################################################################################################");
+
+			for (String mod : missingMods) {
+				log("Missing mod! : " + mod);
+			}
+			missingMods = null;
+
 			Interface.setStatus("Complete");
 
 			Desktop.getDesktop().open(outputDir);
@@ -193,8 +204,11 @@ public final class CMPDL {
 
 		Files.walk(overridesDir.toPath()).forEach(path -> {
 			try {
+				log("Override: " + path.getFileName());
 				Files.copy(path, Paths.get(path.toString().replace(overridesDir.toString(), outDir.toString())));
-			} catch(IOException e) { }
+			} catch(IOException e) {
+				log("Error copying " + path.getFileName() + ": " + e.getMessage() + ", " + e.getClass());
+			}
 		});
 		log("Done copying overrides");
 	}
@@ -265,8 +279,10 @@ public final class CMPDL {
 
 		Interface.setStatus("Downloading " + filename + " (" + (total - remaining) + "/" + total + ")");
 
-		if(filename.endsWith("cookieTest=1"))
+		if(filename.endsWith("cookieTest=1")) {
 			log("Missing file! Skipping it");
+			missingMods.add(finalUrl);
+		}
 		else {
 			log("Downloading " + filename);
 
@@ -285,6 +301,7 @@ public final class CMPDL {
 		for(;;) {
 			URL url = uri.toURL();
 			connection = (HttpURLConnection) url.openConnection();
+			connection.setRequestProperty("User-Agent", "CMPDL/1.0.0");
 			connection.setInstanceFollowRedirects(false);
 			String redirectLocation = connection.getHeaderField("Location");
 			if(redirectLocation == null)
