@@ -53,6 +53,16 @@ public final class CMPDL {
 		if(downloading)
 			return;
 
+		if(url.contains("feed-the-beast.com") && version.equals("latest")) {
+			log("WARNING: For modpacks hosted in the FTB site, you need to provide a version, \"latest\" will not work!");
+			log("To find the version number to insert in the Curse File ID field, click the latest file on the sidebar on the right of the modpack's page.");
+			log("The number you need to input is the number at the end of the URL.");
+			log("For example, if you wanted to download https://www.feed-the-beast.com/projects/ftb-presents-skyfactory-3/files/2390075");
+			log("Then you would use 2390075 as the Curse File ID. Do not change the Modpack URL. Change that and click Download again to continue.");
+			Interface.setStatus("Awaiting Further Input");
+			return;
+		}
+		
 		missingMods = new ArrayList<String>();
 		downloading = true;
 		log("~ Starting magical modpack download sequence ~");
