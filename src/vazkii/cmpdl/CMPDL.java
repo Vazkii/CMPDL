@@ -298,10 +298,11 @@ public final class CMPDL {
 	public static String getLocationHeader(String location) throws IOException, URISyntaxException {
 		URI uri = new URI(location);
 		HttpURLConnection connection = null;
+		String userAgent="Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Ubuntu Chromium/53.0.2785.143 Chrome/53.0.2785.143 Safari/537.36";
 		for(;;) {
 			URL url = uri.toURL();
 			connection = (HttpURLConnection) url.openConnection();
-			connection.setRequestProperty("User-Agent", "CMPDL/1.0.0");
+			connection.setRequestProperty("User-Agent", userAgent);
 			connection.setInstanceFollowRedirects(false);
 			String redirectLocation = connection.getHeaderField("Location");
 			if(redirectLocation == null)
