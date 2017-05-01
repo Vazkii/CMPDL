@@ -77,7 +77,7 @@ public final class CMPDL {
 			packVersion = "latest";
 
 		String fileUrl;
-		if (packVersion == "latest")
+		if (packVersion.equals("latest"))
 			fileUrl = packUrl + "/files/latest";
 		else
 			fileUrl = packUrl + "/files/" + packVersion + "/download";
