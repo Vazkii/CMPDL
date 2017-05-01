@@ -15,6 +15,8 @@ import java.net.URL;
 import java.net.URLDecoder;
 import java.nio.file.Files;
 import java.nio.file.Paths;
+import java.util.ArrayList;
+import java.util.List;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
@@ -31,21 +33,27 @@ public final class CMPDL {
 
 	public static boolean downloading = false;
 
+	private static List<String> missingMods = null;
+
 	public static void main(String[] args) {
 		if(args.length > 0) {
 			String url = args[0];
+			String version = "latest";
+			if (args.length > 1)
+				version = args[1];
 			try {
-				downloadFromURL(url);
+				downloadFromURL(url, version);
 			} catch(Exception e) {
 				throw new RuntimeException(e);
 			}
 		} else Interface.openInterface();
 	}
 
-	public static void downloadFromURL(String url) throws Exception {
+	public static void downloadFromURL(String url, String version) throws Exception {
 		if(downloading)
 			return;
 
+		missingMods = new ArrayList<String>();
 		downloading = true;
 		log("~ Starting magical modpack download sequence ~");
 		Interface.setStatus("Starting up");
@@ -54,7 +62,16 @@ public final class CMPDL {
 		if(packUrl.endsWith("/"))
 			packUrl = packUrl.replaceAll(".$", "");
 
-		String fileUrl = packUrl + "/files/latest";
+		String packVersion = version;
+		if(version == null || version.isEmpty())
+			packVersion = "latest";
+
+		String fileUrl;
+		if (packVersion == "latest")
+			fileUrl = packUrl + "/files/latest";
+		else
+			fileUrl = packUrl + "/files/" + packVersion + "/download";
+
 		String finalUrl = getLocationHeader(fileUrl);
 		log("URLs: " + fileUrl + " " + finalUrl);
 		Matcher matcher = FILE_NAME_URL_PATTERN.matcher(finalUrl);
@@ -85,6 +102,12 @@ public final class CMPDL {
 			log("A later version will probably also work just as fine, but this is the version shipped with the pack");
 			log("This is also added to the instance notes");
 			log("################################################################################################");
+
+			for (String mod : missingMods) {
+				log("Missing mod! : " + mod);
+			}
+			missingMods = null;
+
 			Interface.setStatus("Complete");
 
 			Desktop.getDesktop().open(outputDir);
@@ -108,7 +131,7 @@ public final class CMPDL {
 
 		String zipName = filename;
 		if(!zipName.endsWith(".zip"))
-			zipName = zipName + ".zip";		
+			zipName = zipName + ".zip";
 
 		String retPath = retDir.getAbsolutePath();
 		retDir.deleteOnExit();
@@ -166,7 +189,7 @@ public final class CMPDL {
 		int left = total;
 		for(Manifest.FileData f : manifest.files) {
 			left--;
-			downloadFile(f, modsDir, left, total); 
+			downloadFile(f, modsDir, left, total);
 		}
 
 		log("Mod downloads complete");
@@ -181,8 +204,11 @@ public final class CMPDL {
 
 		Files.walk(overridesDir.toPath()).forEach(path -> {
 			try {
+				log("Override: " + path.getFileName());
 				Files.copy(path, Paths.get(path.toString().replace(overridesDir.toString(), outDir.toString())));
-			} catch(IOException e) { }
+			} catch(IOException e) {
+				log("Error copying " + path.getFileName() + ": " + e.getMessage() + ", " + e.getClass());
+			}
 		});
 		log("Done copying overrides");
 	}
@@ -253,8 +279,10 @@ public final class CMPDL {
 
 		Interface.setStatus("Downloading " + filename + " (" + (total - remaining) + "/" + total + ")");
 
-		if(filename.endsWith("cookieTest=1"))
+		if(filename.endsWith("cookieTest=1")) {
 			log("Missing file! Skipping it");
+			missingMods.add(finalUrl);
+		}
 		else {
 			log("Downloading " + filename);
 
@@ -277,12 +305,12 @@ public final class CMPDL {
 			connection.setRequestProperty("User-Agent", userAgent);
 			connection.setInstanceFollowRedirects(false);
 			String redirectLocation = connection.getHeaderField("Location");
-			if(redirectLocation == null) 
+			if(redirectLocation == null)
 				break;
 
 			redirectLocation = redirectLocation.replaceAll("\\[", "%5B");
 			redirectLocation = redirectLocation.replaceAll("\\]", "%5D");
-			
+
 			if(redirectLocation.startsWith("/"))
 				uri = new URI(uri.getScheme(), uri.getHost(), redirectLocation, uri.getFragment());
 			else uri = new URI(redirectLocation);
@@ -306,7 +334,7 @@ public final class CMPDL {
 
 	public static void log(String s) {
 		Interface.addLogLine(s);
-		System.out.println(s); 
+		System.out.println(s);
 	}
 
 	private CMPDL() {}

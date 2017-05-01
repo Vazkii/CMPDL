@@ -3,9 +3,11 @@ package vazkii.cmpdl;
 public class OperatorThread extends Thread {
 
 	String url;
+	String version;
 
-	public OperatorThread(String url) {
+	public OperatorThread(String url, String version) {
 		this.url = url;
+		this.version = version;
 		setName("Operator");
 		setDaemon(true);
 		start();
@@ -14,7 +16,7 @@ public class OperatorThread extends Thread {
 	@Override
 	public void run() {
 		try {
-			CMPDL.downloadFromURL(url);
+			CMPDL.downloadFromURL(url, version);
 		} catch(Exception ex) {
 			Interface.addLogLine("Error: " + ex.getLocalizedMessage());
 			for(StackTraceElement e : ex.getStackTrace())
