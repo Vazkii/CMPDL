@@ -3,6 +3,7 @@ package vazkii.cmpdl;
 import java.awt.Desktop;
 import java.io.BufferedWriter;
 import java.io.File;
+import java.io.FileNotFoundException;
 import java.io.FileOutputStream;
 import java.io.FileReader;
 import java.io.FileWriter;
@@ -13,6 +14,7 @@ import java.net.URI;
 import java.net.URISyntaxException;
 import java.net.URL;
 import java.net.URLDecoder;
+import java.nio.file.FileAlreadyExistsException;
 import java.nio.file.Files;
 import java.nio.file.Paths;
 import java.util.ArrayList;
@@ -33,7 +35,7 @@ public final class CMPDL {
 
 	public static boolean downloading = false;
 
-	private static List<String> missingMods = null;
+	public static List<String> missingMods = null;
 
 	public static void main(String[] args) {
 		if(args.length > 0) {
@@ -101,7 +103,7 @@ public final class CMPDL {
 			copyOverrides(manifest, unzippedDir, minecraftDir);
 			setupMultimcInfo(manifest, outputDir);
 
-			downloading = false;
+			Interface.finishDownload(false);
 
 			log("And we're done!");
 			log("Output Path: " + outputDir);
@@ -111,12 +113,21 @@ public final class CMPDL {
 			log("The Forge version you need is " + manifest.getForgeVersion());
 			log("A later version will probably also work just as fine, but this is the version shipped with the pack");
 			log("This is also added to the instance notes");
-			log("################################################################################################");
 
-			for (String mod : missingMods) {
-				log("Missing mod! : " + mod);
+			if(!missingMods.isEmpty()) {
+				log("");
+				log("WARNING: Some mods could not be downloaded. Either the specific versions were taken down from "
+						+ "public download on CurseForge, or there were errors in the download.");
+				log("The missing mods are the following:");
+				for(String mod : missingMods) 
+					log(" - " + mod);
+				log("");
+				log("If these mods are crucial to the modpack functioning, try downloading the server version of the pack "
+						+ "and pulling them from there.");
 			}
 			missingMods = null;
+			
+			log("################################################################################################");
 
 			Interface.setStatus("Complete");
 
@@ -191,6 +202,7 @@ public final class CMPDL {
 
 		log("Downloading modpack from Manifest");
 		log("Manifest contains " + total + " files to download");
+		log("");
 
 		File modsDir = new File(outputDir, "mods");
 		if(!modsDir.exists())
@@ -217,7 +229,8 @@ public final class CMPDL {
 				log("Override: " + path.getFileName());
 				Files.copy(path, Paths.get(path.toString().replace(overridesDir.toString(), outDir.toString())));
 			} catch(IOException e) {
-				log("Error copying " + path.getFileName() + ": " + e.getMessage() + ", " + e.getClass());
+				if(!(e instanceof FileAlreadyExistsException))
+					log("Error copying " + path.getFileName() + ": " + e.getMessage() + ", " + e.getClass());
 			}
 		});
 		log("Done copying overrides");
@@ -269,8 +282,9 @@ public final class CMPDL {
 
 	public static void downloadFile(Manifest.FileData file, File modsDir, int remaining, int total) throws IOException, URISyntaxException {
 		log("Downloading " + file);
-		Interface.setStatus("Acquiring Info for file " + file + " (" + (total - remaining) + "/" + total + ")");
-
+		Interface.setStatus("File: " + file + " (" + (total - remaining) + "/" + total + ")");
+		Interface.setStatus2("Acquiring Info");
+		
 		String baseUrl = "http://minecraft.curseforge.com/projects/" + file.projectID;
 		log("Project URL is " + baseUrl);
 
@@ -287,7 +301,7 @@ public final class CMPDL {
 		String filename = m.group(1);
 		filename = URLDecoder.decode(filename, "UTF-8");
 
-		Interface.setStatus("Downloading " + filename + " (" + (total - remaining) + "/" + total + ")");
+		Interface.setStatus2("Downloading");
 
 		if(filename.endsWith("cookieTest=1")) {
 			log("Missing file! Skipping it");
@@ -297,12 +311,24 @@ public final class CMPDL {
 			log("Downloading " + filename);
 
 			File f = new File(modsDir, filename);
-			if(f.exists())
-				log("This file already exists. No need to download it");
-			else downloadFileFromURL(f, new URL(finalUrl));
-
-			log("Downloaded! " + remaining + "/" + total + " remaining");
+			try {
+				if(filename.equals("download"))
+					throw new FileNotFoundException("Invalid filename");
+				
+				if(f.exists())
+					log("This file already exists. No need to download it");
+				else 
+					downloadFileFromURL(f, new URL(finalUrl));
+				log("Downloaded! " + remaining + "/" + total + " remaining");
+			} catch(FileNotFoundException e) {
+				Interface.addLogLine("Error: " + e.getClass().toString() + ": " + e.getLocalizedMessage());
+				Interface.addLogLine("This mod will not be downloaded. If you need the file, you'll have to get it manually:");
+				Interface.addLogLine(finalUrl);
+				CMPDL.missingMods.add(finalUrl);
+			}
 		}
+		
+		log("");
 	}
 
 	public static String getLocationHeader(String location) throws IOException, URISyntaxException {
@@ -329,7 +355,7 @@ public final class CMPDL {
 		return uri.toString();
 	}
 
-	public static void downloadFileFromURL(File f, URL url) throws IOException {
+	public static void downloadFileFromURL(File f, URL url) throws IOException, FileNotFoundException {
 		if(!f.exists())
 			f.createNewFile();
 

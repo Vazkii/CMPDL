@@ -18,7 +18,7 @@ public class OperatorThread extends Thread {
 		try {
 			CMPDL.downloadFromURL(url, version);
 		} catch(Exception ex) {
-			Interface.addLogLine("Error: " + ex.getLocalizedMessage());
+			Interface.addLogLine("Error: " + ex.getClass().toString() + ": " + ex.getLocalizedMessage());
 			for(StackTraceElement e : ex.getStackTrace())
 				Interface.addLogLine(e.toString());
 

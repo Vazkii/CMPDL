@@ -29,10 +29,14 @@ import javax.swing.text.DefaultCaret;
 public class Interface {
 
 	private static Frame frame;
-	public static Thread operatorThread;
+	public static OperatorThread operatorThread;
 
+	private static String line1 = "";
+	private static String line2 = "";
+	
 	public static void openInterface() {
 		frame = new Frame();
+		setStatus("Idle");
 	}
 
 	public static void addLogLine(String s) {
@@ -43,8 +47,38 @@ public class Interface {
 	}
 
 	public static void setStatus(String status) {
+		setStatus(status, true);
+	}
+	
+	public static void setStatus(String status, boolean clear) {
+		line1 = status;
+		if(clear)
+			setStatus2("");
+		else updateLabel();
+	}
+	
+	public static void setStatus2(String status) {
+		line2 = status;
+		updateLabel();
+	}
+	
+	private static void updateLabel() {
 		if(frame != null)
-			frame.currentStatus.setText(status);
+			frame.currentStatus.setText(String.format("<html>%s<br>%s</html>", line1, line2));
+	}
+	
+	@SuppressWarnings("deprecation")
+	public static void finishDownload(boolean killThread) {
+		if(operatorThread != null && operatorThread.isAlive() && killThread) {
+			operatorThread.interrupt();
+			operatorThread.stop();
+			operatorThread = null;
+		}
+		
+		if(frame != null)
+			frame.downloadButton.setText("Download");
+		
+		CMPDL.downloading = false;
 	}
 
 	static final class Frame extends JFrame implements ActionListener, KeyListener {
@@ -100,7 +134,7 @@ public class Interface {
 			DefaultCaret caret = (DefaultCaret) logArea.getCaret();
 			caret.setUpdatePolicy(DefaultCaret.ALWAYS_UPDATE);
 
-			currentStatus = new JLabel("Idle", SwingConstants.LEFT);
+			currentStatus = new JLabel("", SwingConstants.LEFT);
 
 			clearButton = new JButton("Clear Output");
 			clearButton.setAction(new AbstractAction("Clear Output") {
@@ -165,10 +199,21 @@ public class Interface {
 
 		@Override
 		public void actionPerformed(ActionEvent e) {
-			String url = urlField.getText();
-			String version = versionField.getText();
-			if(url != null && !url.isEmpty() && !CMPDL.downloading)
-				operatorThread = new OperatorThread(url, version);
+			if(e.getSource() == downloadButton) {
+				boolean downloading = CMPDL.downloading;
+				if(downloading && operatorThread != null) {
+					Interface.finishDownload(true);
+					Interface.setStatus("Stopped Manually");
+				} else {
+					String url = urlField.getText();
+					String version = versionField.getText();
+					if(url != null && !url.isEmpty() && !downloading) {
+						operatorThread = new OperatorThread(url, version);
+						((JButton) e.getSource()).setText("Stop");	
+					}
+				}
+			}
+
 		}
 
 		@Override public void keyPressed(KeyEvent e) {	}
