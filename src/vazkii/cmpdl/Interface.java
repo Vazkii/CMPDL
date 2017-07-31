@@ -80,6 +80,11 @@ public class Interface {
 		
 		CMPDL.downloading = false;
 	}
+	
+	public static void error() {
+		finishDownload(false);
+		setStatus("Errored");
+	}
 
 	static final class Frame extends JFrame implements ActionListener, KeyListener {
 

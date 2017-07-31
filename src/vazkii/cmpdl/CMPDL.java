@@ -68,6 +68,8 @@ public final class CMPDL {
 		missingMods = new ArrayList<String>();
 		downloading = true;
 		log("~ Starting magical modpack download sequence ~");
+		log("Input URL: " + url);
+		log("Input Version: " + version);
 		Interface.setStatus("Starting up");
 
 		String packUrl = url;
@@ -85,7 +87,10 @@ public final class CMPDL {
 			fileUrl = packUrl + "/files/" + packVersion + "/download";
 
 		String finalUrl = getLocationHeader(fileUrl);
-		log("URLs: " + fileUrl + " " + finalUrl);
+		log("File URL: " + fileUrl);
+		log("Final URL: " + finalUrl);
+		log("");
+
 		Matcher matcher = FILE_NAME_URL_PATTERN.matcher(finalUrl);
 		if(matcher.matches()) {
 			String filename = matcher.group(1);
@@ -133,8 +138,7 @@ public final class CMPDL {
 
 			Desktop.getDesktop().open(outputDir);
 		} else {
-			downloading = false;
-			Interface.setStatus("Errored");
+			Interface.error();
 		}
 	}
 
@@ -343,13 +347,16 @@ public final class CMPDL {
 			String redirectLocation = connection.getHeaderField("Location");
 			if(redirectLocation == null)
 				break;
-
-			redirectLocation = redirectLocation.replaceAll("\\[", "%5B");
-			redirectLocation = redirectLocation.replaceAll("\\]", "%5D");
+			
+			// This gets parsed out later
+			redirectLocation = redirectLocation.replaceAll("\\%20", " ");
 
 			if(redirectLocation.startsWith("/"))
 				uri = new URI(uri.getScheme(), uri.getHost(), redirectLocation, uri.getFragment());
-			else uri = new URI(redirectLocation);
+			else {
+				url = new URL(redirectLocation);
+				uri = new URI(url.getProtocol(), url.getUserInfo(), url.getHost(), url.getPort(), url.getPath(), url.getQuery(), url.getRef());
+			}
 		}
 
 		return uri.toString();

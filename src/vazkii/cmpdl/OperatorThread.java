@@ -24,8 +24,7 @@ public class OperatorThread extends Thread {
 
 			ex.printStackTrace();
 
-			CMPDL.downloading = false;
-			Interface.setStatus("Errored");
+			Interface.error();
 		}
 
 		Interface.operatorThread = null;
