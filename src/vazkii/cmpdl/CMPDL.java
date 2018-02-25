@@ -97,7 +97,7 @@ public final class CMPDL {
 			log("Modpack filename is " + filename);
 
 			File unzippedDir = setupModpackMetadata(filename, finalUrl);
-			Manifest manifest = getManifest(unzippedDir);
+			Manifest manifest = getManifest(unzippedDir, url);
 			File outputDir = getOutputDir(filename);
 
 			File minecraftDir = new File(outputDir, "minecraft");
@@ -189,11 +189,17 @@ public final class CMPDL {
 		return homeDir;
 	}
 
-	public static Manifest getManifest(File dir) throws IOException {
+	public static Manifest getManifest(File dir, String url) throws IOException {
 		Interface.setStatus("Parsing Manifest");
 		File f = new File(dir, "manifest.json");
-		if(!f.exists())
-			throw new IllegalArgumentException("This modpack has no manifest");
+		if(!f.exists()){
+			f = new File(dir, "mcmod.info");
+			if (! f.exists())
+				throw new IllegalArgumentException("This modpack has no manifest.json or mcmod.info");
+			log("Parsing manifest from mcmod.info");
+			Manifest manifest = Manifest.createFromMcModInfo(f, url);
+			return manifest;
+		}
 
 		log("Parsing Manifest");
 		Manifest manifest = GSON_INSTANCE.fromJson(new FileReader(f), Manifest.class);
@@ -334,33 +340,37 @@ public final class CMPDL {
 		
 		log("");
 	}
-
-	public static String getLocationHeader(String location) throws IOException, URISyntaxException {
-		URI uri = new URI(location);
-		HttpURLConnection connection = null;
-		String userAgent="Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Ubuntu Chromium/53.0.2785.143 Chrome/53.0.2785.143 Safari/537.36";
-		for(;;) {
-			URL url = uri.toURL();
-			connection = (HttpURLConnection) url.openConnection();
-			connection.setRequestProperty("User-Agent", userAgent);
-			connection.setInstanceFollowRedirects(false);
-			String redirectLocation = connection.getHeaderField("Location");
-			if(redirectLocation == null)
-				break;
-			
-			// These get parsed out later
-			redirectLocation = redirectLocation.replaceAll("\\%20", " ");
-			redirectLocation = redirectLocation.replaceAll("\\%27", "'");
-
-			if(redirectLocation.startsWith("/"))
-				uri = new URI(uri.getScheme(), uri.getHost(), redirectLocation, uri.getFragment());
-			else {
-				url = new URL(redirectLocation);
-				uri = new URI(url.getProtocol(), url.getUserInfo(), url.getHost(), url.getPort(), url.getPath(), url.getQuery(), url.getRef());
+	public static String getLocationHeader(String location) throws IOException, URISyntaxException  {
+		return getLocationHeader(location, new URI(location));
+	}
+	public static String getLocationHeader(String location, URI uri) throws IOException, URISyntaxException  {
+		String url = location;
+		if (location.startsWith("/")){
+			url = uri.getScheme() + "://" + uri.getHost() + url;
+		}
+		HttpURLConnection con = (HttpURLConnection) new URL(url).openConnection();
+		con.setInstanceFollowRedirects(false);
+		con.connect();
+		try{
+			con.getInputStream();
+		} catch (IOException exception) {
+			if (con.getResponseCode() == 400){
+				if(location.startsWith("/"))
+					uri = new URI(uri.getScheme(), uri.getHost(), location, uri.getFragment());
+				else {
+					URL xurl = new URL(location);
+					uri = new URI(xurl.getProtocol(), xurl.getUserInfo(), xurl.getHost(), xurl.getPort(), xurl.getPath(), xurl.getQuery(), xurl.getRef());
+				}
+				return uri.toString();
 			}
 		}
 
-		return uri.toString();
+		if (con.getResponseCode() == HttpURLConnection.HTTP_MOVED_PERM || con.getResponseCode() == HttpURLConnection.HTTP_MOVED_TEMP || con.getResponseCode() == 307) {
+			String redirectUrl = con.getHeaderField("Location");
+			return getLocationHeader(redirectUrl, uri);
+		}
+
+		return url;
 	}
 
 	public static void downloadFileFromURL(File f, URL url) throws IOException, FileNotFoundException {
