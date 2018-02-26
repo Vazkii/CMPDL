@@ -354,7 +354,7 @@ public final class CMPDL {
 		try{
 			con.getInputStream();
 		} catch (IOException exception) {
-			if (con.getResponseCode() == 400){
+			if (con.getResponseCode() == HttpURLConnection.HTTP_BAD_REQUEST){
 				if(location.startsWith("/"))
 					uri = new URI(uri.getScheme(), uri.getHost(), location, uri.getFragment());
 				else {
