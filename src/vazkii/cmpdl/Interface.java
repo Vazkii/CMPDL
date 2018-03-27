@@ -9,12 +9,14 @@ import java.awt.event.KeyEvent;
 import java.awt.event.KeyListener;
 import java.awt.event.WindowAdapter;
 import java.awt.event.WindowEvent;
+import java.io.File;
 
 import javax.swing.AbstractAction;
 import javax.swing.BorderFactory;
 import javax.swing.Box;
 import javax.swing.BoxLayout;
 import javax.swing.JButton;
+import javax.swing.JFileChooser;
 import javax.swing.JFrame;
 import javax.swing.JLabel;
 import javax.swing.JPanel;
@@ -25,6 +27,8 @@ import javax.swing.SwingConstants;
 import javax.swing.UIManager;
 import javax.swing.border.Border;
 import javax.swing.text.DefaultCaret;
+
+import javafx.stage.FileChooser;
 
 public class Interface {
 
@@ -76,7 +80,7 @@ public class Interface {
 		}
 		
 		if(frame != null)
-			frame.downloadButton.setText("Download");
+			frame.setStopButtonVisibility(false);
 		
 		CMPDL.downloading = false;
 	}
@@ -96,6 +100,9 @@ public class Interface {
 		JPanel versionPanel;
 		JPanel statusPanel;
 		JButton downloadButton;
+		JLabel orLabel;
+		JButton chooseFileButton;
+		JFileChooser fileChooser;
 		JLabel urlLabel;
 		JLabel versionLabel;
 		JScrollPane scrollPane;
@@ -104,6 +111,7 @@ public class Interface {
 		JTextArea logArea;
 		JLabel currentStatus;
 		JButton clearButton;
+
 
 		public Frame() {
 			setSize(800, 640);
@@ -121,6 +129,11 @@ public class Interface {
 			statusPanel = new JPanel();
 			downloadButton = new JButton("Download");
 			downloadButton.setAlignmentX(CENTER_ALIGNMENT);
+			orLabel = new JLabel("or you can");
+			orLabel.setAlignmentX(CENTER_ALIGNMENT);
+			chooseFileButton = new JButton("Choose local modpack");
+			chooseFileButton.setAlignmentX(CENTER_ALIGNMENT);
+			fileChooser = new JFileChooser();
 			urlLabel = new JLabel("Modpack URL :");
 			urlField = new JTextField("", 54);
 			versionLabel = new JLabel("Curse File ID :");
@@ -165,6 +178,8 @@ public class Interface {
 			downloadPanel.add(versionPanel);
 			panel.add(downloadPanel);
 			panel.add(downloadButton);
+			panel.add(orLabel);
+			panel.add(chooseFileButton);
 			panel.add(scrollPane);
 			statusPanel.setLayout(new BorderLayout());
 			statusPanel.setBorder(BorderFactory.createEmptyBorder(10,10,10,10));
@@ -176,6 +191,7 @@ public class Interface {
 
 			downloadButton.requestFocus();
 			downloadButton.addActionListener(this);
+			chooseFileButton.addActionListener(this);
 			urlField.addKeyListener(this);
 			versionField.addKeyListener(this);
 
@@ -214,11 +230,24 @@ public class Interface {
 					String version = versionField.getText();
 					if(url != null && !url.isEmpty() && !downloading) {
 						operatorThread = new OperatorThread(url, version);
-						((JButton) e.getSource()).setText("Stop");	
+						setStopButtonVisibility(true);
 					}
 				}
 			}
-
+			if(e.getSource() == chooseFileButton) {
+				int returnVal = fileChooser.showOpenDialog(this);
+				if(returnVal == JFileChooser.APPROVE_OPTION) {
+					File chosenFile = fileChooser.getSelectedFile();
+					operatorThread = new OperatorThread(chosenFile);
+					setStopButtonVisibility(true);
+				}
+			}
+		}
+		
+		public void setStopButtonVisibility(boolean show) {
+			chooseFileButton.setVisible(!show);
+			orLabel.setVisible(!show);
+			downloadButton.setText(show ? "Stop" : "Download");
 		}
 
 		@Override public void keyPressed(KeyEvent e) {	}

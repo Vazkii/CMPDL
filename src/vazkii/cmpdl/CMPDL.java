@@ -96,7 +96,7 @@ public final class CMPDL {
 			String filename = matcher.group(1);
 			log("Modpack filename is " + filename);
 
-			File unzippedDir = setupModpackMetadata(filename, finalUrl);
+			File unzippedDir = downloadModpackMetadata(filename, finalUrl);
 			Manifest manifest = getManifest(unzippedDir);
 			File outputDir = getOutputDir(filename);
 
@@ -109,42 +109,95 @@ public final class CMPDL {
 			setupMultimcInfo(manifest, outputDir);
 
 			Interface.finishDownload(false);
-
-			log("And we're done!");
-			log("Output Path: " + outputDir);
-			log("");
-			log("################################################################################################");
-			log("IMPORTANT NOTE: If you want to import this instance to MultiMC, you must install Forge manually");
-			log("The Forge version you need is " + manifest.getForgeVersion());
-			log("A later version will probably also work just as fine, but this is the version shipped with the pack");
-			log("This is also added to the instance notes");
-
-			if(!missingMods.isEmpty()) {
-				log("");
-				log("WARNING: Some mods could not be downloaded. Either the specific versions were taken down from "
-						+ "public download on CurseForge, or there were errors in the download.");
-				log("The missing mods are the following:");
-				for(String mod : missingMods) 
-					log(" - " + mod);
-				log("");
-				log("If these mods are crucial to the modpack functioning, try downloading the server version of the pack "
-						+ "and pulling them from there.");
-			}
-			missingMods = null;
 			
-			log("################################################################################################");
-
-			Interface.setStatus("Complete");
-
-			Desktop.getDesktop().open(outputDir);
+			endSetup(outputDir, manifest);
 		} else {
 			Interface.error();
 		}
 	}
 
-	public static File setupModpackMetadata(String filename, String url) throws IOException, ZipException {
+	public static void setupFromLocalFile(File file) throws Exception {
+		missingMods = new ArrayList<String>();
+		downloading = true;
+
+		String filename = file.getName();
+		log("Modpack filename is " + filename);
+
+		File unzippedDir = setupLocalModpackMetadata(file);
+		Manifest manifest = getManifest(unzippedDir);
+		File outputDir = getOutputDir(filename);
+
+		File minecraftDir = new File(outputDir, "minecraft");
+		if(!minecraftDir.exists())
+			minecraftDir.mkdir();
+
+		downloadModpackFromManifest(minecraftDir, manifest);
+		copyOverrides(manifest, unzippedDir, minecraftDir);
+		setupMultimcInfo(manifest, outputDir);
+
+		endSetup(outputDir, manifest);
+	}
+	
+	public static void endSetup(File outputDir, Manifest manifest) throws IOException {
+		log("And we're done!");
+		log("Output Path: " + outputDir);
+		log("");
+		log("################################################################################################");
+		log("IMPORTANT NOTE: If you want to import this instance to MultiMC, you must install Forge manually");
+		log("The Forge version you need is " + manifest.getForgeVersion());
+		log("A later version will probably also work just as fine, but this is the version shipped with the pack");
+		log("This is also added to the instance notes");
+
+		if(!missingMods.isEmpty()) {
+			log("");
+			log("WARNING: Some mods could not be downloaded. Either the specific versions were taken down from "
+					+ "public download on CurseForge, or there were errors in the download.");
+			log("The missing mods are the following:");
+			for(String mod : missingMods) 
+				log(" - " + mod);
+			log("");
+			log("If these mods are crucial to the modpack functioning, try downloading the server version of the pack "
+					+ "and pulling them from there.");
+		}
+		missingMods = null;
+		
+		log("################################################################################################");
+
+		Interface.setStatus("Complete");
+
+		Desktop.getDesktop().open(outputDir);
+	}
+
+	public static File downloadModpackMetadata(String filename, String url) throws IOException, ZipException {
 		Interface.setStatus("Setting up Metadata");
 
+		String zipName = filename;
+		if(!zipName.endsWith(".zip"))
+			zipName = zipName + ".zip";
+
+		File retDir = setupTemporaryDirectory(filename);
+		
+		log("Downloading zip file " + zipName);
+		Interface.setStatus("Downloading Modpack .zip");
+		File f = new File(retDir, zipName);
+		downloadFileFromURL(f, new URL(url));
+		
+		extractModpackMetadata(f, retDir);
+
+		return retDir;
+	}
+	
+	public static File setupLocalModpackMetadata(File file) throws ZipException {
+		Interface.setStatus("Setting up Metadata");
+
+		File retDir = setupTemporaryDirectory(file.getName());
+		
+		extractModpackMetadata(file, retDir);
+
+		return retDir;
+	}
+	
+	public static File setupTemporaryDirectory(String filename) {
 		File homeDir = getTempDir();
 
 		File retDir = new File(homeDir, filename);
@@ -153,27 +206,21 @@ public final class CMPDL {
 			log("Directory doesn't exist, making it now");
 			retDir.mkdir();
 		}
-
-		String zipName = filename;
-		if(!zipName.endsWith(".zip"))
-			zipName = zipName + ".zip";
-
-		String retPath = retDir.getAbsolutePath();
+		
 		retDir.deleteOnExit();
+		
+		return retDir;
+	}
 
-		log("Downloading zip file " + zipName);
-		Interface.setStatus("Downloading Modpack .zip");
-		File f = new File(retDir, zipName);
-		downloadFileFromURL(f, new URL(url));
-
+	public static void extractModpackMetadata(File f, File retDir) throws ZipException {
+		String retPath = retDir.getAbsolutePath();
+		
 		Interface.setStatus("Unzipping Modpack Download");
 		log("Unzipping file");
 		ZipFile zip = new ZipFile(f);
 		zip.extractAll(retPath);
 
 		log("Done unzipping");
-
-		return retDir;
 	}
 
 	public static File getTempDir() {
@@ -374,7 +421,7 @@ public final class CMPDL {
 				outStream.write(buff, 0, i);
 		}
 	}
-
+	
 	public static void log(String s) {
 		Interface.addLogLine(s);
 		System.out.println(s);
