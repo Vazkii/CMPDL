@@ -355,7 +355,7 @@ public final class CMPDL {
 				uri = new URI(uri.getScheme(), uri.getHost(), redirectLocation, uri.getFragment());
 			else {
 				url = new URL(redirectLocation);
-				uri = new URI(url.getProtocol(), url.getUserInfo(), url.getHost(), url.getPort(), url.getPath(), url.getQuery(), url.getRef());
+				uri = new URI(url.getProtocol(), url.getUserInfo(), url.getHost(), url.getPort(), URLDecoder.decode(url.getPath(), "UTF-8"), url.getQuery(), url.getRef());
 			}
 		}
 
