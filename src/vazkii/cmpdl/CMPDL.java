@@ -324,7 +324,7 @@ public final class CMPDL {
 				else 
 					downloadFileFromURL(f, new URL(finalUrl));
 				log("Downloaded! " + remaining + "/" + total + " remaining");
-			} catch(FileNotFoundException e) {
+			} catch(IOException e) {
 				Interface.addLogLine("Error: " + e.getClass().toString() + ": " + e.getLocalizedMessage());
 				Interface.addLogLine("This mod will not be downloaded. If you need the file, you'll have to get it manually:");
 				Interface.addLogLine(finalUrl);
