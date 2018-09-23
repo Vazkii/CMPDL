@@ -28,8 +28,6 @@ import javax.swing.UIManager;
 import javax.swing.border.Border;
 import javax.swing.text.DefaultCaret;
 
-import javafx.stage.FileChooser;
-
 public class Interface {
 
 	private static Frame frame;
