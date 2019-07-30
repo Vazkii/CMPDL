@@ -135,7 +135,7 @@ public class Interface {
 			urlLabel = new JLabel("Modpack URL :");
 			urlField = new JTextField("", 54);
 			versionLabel = new JLabel("Curse File ID :");
-			versionField = new JTextField("latest", 20);
+			versionField = new JTextField("", 20);
 
 			logArea = new JTextArea(34, 68);
 			logArea.setBackground(Color.WHITE);
