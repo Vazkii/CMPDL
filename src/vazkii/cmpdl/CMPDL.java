@@ -35,6 +35,8 @@ public final class CMPDL {
 
 	public static boolean downloading = false;
 
+	public static String outputBaseDir;
+
 	public static List<String> missingMods = null;
 
 	public static void main(String[] args) {
@@ -44,6 +46,9 @@ public final class CMPDL {
 			if (args.length > 1)
 				version = args[1];
 			try {
+				outputBaseDir = getDefaultOutputBaseDir();
+				if (args.length > 2)
+					outputBaseDir = args[2];
 				downloadFromURL(url, version);
 			} catch(Exception e) {
 				throw new RuntimeException(e);
@@ -318,13 +323,15 @@ public final class CMPDL {
 		}
 	}
 
-	public static File getOutputDir(String filename) throws IOException, URISyntaxException {
+	public static String getDefaultOutputBaseDir() throws IOException, URISyntaxException {
 		File jarFile = new File(CMPDL.class.getProtectionDomain().getCodeSource().getLocation().toURI());
-		String homePath = jarFile.getParentFile().getAbsolutePath();
+		return jarFile.getParentFile().getAbsolutePath();
+	}
 
+	public static File getOutputDir(String filename) throws IOException, URISyntaxException {
 		String outname = URLDecoder.decode(filename, "UTF-8");
 		outname = outname.replaceAll(".zip", "");
-		File outDir = new File(homePath, outname);
+		File outDir = new File(outputBaseDir, outname);
 
 		log("Output Dir is " + outDir);
 
