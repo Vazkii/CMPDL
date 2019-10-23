@@ -18,8 +18,9 @@ public class Manifest {
 
     public String getForgeVersion() {
         for (Modloader loader : minecraft.modLoaders) {
-            if (loader.id.startsWith("forge"))
+            if (loader.id.startsWith("forge")) {
                 return loader.id.substring("forge-".length());
+            }
         }
 
         return "N/A";

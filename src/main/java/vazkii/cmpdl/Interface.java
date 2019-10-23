@@ -5,7 +5,7 @@ import javax.swing.border.Border;
 import javax.swing.text.DefaultCaret;
 import java.awt.*;
 import java.awt.event.*;
-import java.io.File;
+import java.nio.file.Path;
 
 public class Interface {
 
@@ -33,9 +33,11 @@ public class Interface {
 
     public static void setStatus(String status, boolean clear) {
         line1 = status;
-        if (clear)
+        if (clear) {
             setStatus2("");
-        else updateLabel();
+        } else {
+            updateLabel();
+        }
     }
 
     public static void setStatus2(String status) {
@@ -44,8 +46,9 @@ public class Interface {
     }
 
     private static void updateLabel() {
-        if (frame != null)
+        if (frame != null) {
             frame.currentStatus.setText(String.format("<html>%s<br>%s</html>", line1, line2));
+        }
     }
 
     @SuppressWarnings("deprecation")
@@ -56,8 +59,9 @@ public class Interface {
             operatorThread = null;
         }
 
-        if (frame != null)
+        if (frame != null) {
             frame.setStopButtonVisibility(false);
+        }
 
         CMPDL.downloading = false;
     }
@@ -191,8 +195,9 @@ public class Interface {
 
         @Override
         public void keyTyped(KeyEvent e) {
-            if (e.getKeyChar() == '\n')
+            /*if (e.getKeyChar() == '\n') {
                 actionPerformed(null);
+            }*/
         }
 
         @Override
@@ -214,7 +219,7 @@ public class Interface {
             if (e.getSource() == chooseFileButton) {
                 int returnVal = fileChooser.showOpenDialog(this);
                 if (returnVal == JFileChooser.APPROVE_OPTION) {
-                    File chosenFile = fileChooser.getSelectedFile();
+                    Path chosenFile = fileChooser.getSelectedFile().toPath();
                     operatorThread = new OperatorThread(chosenFile);
                     setStopButtonVisibility(true);
                 }

@@ -1,28 +1,33 @@
 package vazkii.cmpdl;
 
 import com.google.gson.Gson;
-import net.lingala.zip4j.ZipFile;
-import net.lingala.zip4j.exception.ZipException;
 
 import java.awt.*;
-import java.io.*;
+import java.io.BufferedWriter;
+import java.io.FileNotFoundException;
+import java.io.IOException;
+import java.io.UncheckedIOException;
 import java.net.*;
-import java.nio.file.FileAlreadyExistsException;
-import java.nio.file.Files;
-import java.nio.file.Paths;
+import java.nio.channels.Channels;
+import java.nio.channels.FileChannel;
+import java.nio.channels.ReadableByteChannel;
+import java.nio.charset.StandardCharsets;
+import java.nio.file.*;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.TimeUnit;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
 public final class CMPDL {
 
     public static final Gson GSON_INSTANCE = new Gson();
-
     public static final Pattern FILE_NAME_URL_PATTERN = Pattern.compile(".*?/([^/]*)$");
+    public static String userAgent = "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Ubuntu Chromium/53.0.2785.143 Chrome/53.0.2785.143 Safari/537.36";
 
     public static boolean downloading = false;
-
     public static List<String> missingMods = null;
 
     public static void main(String[] args) {
@@ -36,14 +41,17 @@ public final class CMPDL {
             } catch (Exception e) {
                 throw new RuntimeException(e);
             }
-        } else Interface.openInterface();
+        } else {
+            Interface.openInterface();
+        }
     }
 
     public static void downloadFromURL(String url, String version) throws Exception {
-        if (downloading)
+        if (downloading) {
             return;
+        }
 
-        if (url.contains("feed-the-beast.com") && (version.equals("latest") || version == null || version.isEmpty())) {
+        if (url.contains("feed-the-beast.com") && (version == null || version.isEmpty() || version.equals("latest"))) {
             log("WARNING: For modpacks hosted in the FTB site, you need to provide a version, \"latest\" will not work!");
             log("To find the version number to insert in the Curse File ID field, click the latest file on the sidebar on the right of the modpack's page.");
             log("The number you need to input is the number at the end of the URL.");
@@ -53,7 +61,7 @@ public final class CMPDL {
             return;
         }
 
-        if (url.contains("curseforge.com") && (version.equals("latest") || version == null || version.isEmpty())) {
+        if (url.contains("curseforge.com") && (version == null || version.isEmpty() || version.equals("latest"))) {
             log("WARNING: packversion \"latest\" is currently unsupported as curseforge have changed their url format.");
             log("To find the version number to insert in the Curse File ID field, check the url of the file on the modpack's \"files\" page.");
             log("The number you need to input is the number at the end of the URL.");
@@ -63,7 +71,7 @@ public final class CMPDL {
             return;
         }
 
-        missingMods = new ArrayList<String>();
+        missingMods = new ArrayList<>();
         downloading = true;
         log("~ Starting magical modpack download sequence ~");
         log("Input URL: " + url);
@@ -71,8 +79,9 @@ public final class CMPDL {
         Interface.setStatus("Starting up");
 
         String packUrl = url;
-        if (packUrl.endsWith("/"))
+        if (packUrl.endsWith("/")) {
             packUrl = packUrl.replaceAll(".$", "");
+        }
 
         String packVersion = version;
 
@@ -89,13 +98,14 @@ public final class CMPDL {
             String filename = matcher.group(1);
             log("Modpack filename is " + filename);
 
-            File unzippedDir = downloadModpackMetadata(filename, finalUrl);
+            Path unzippedDir = downloadModpackMetadata(filename, finalUrl);
             Manifest manifest = getManifest(unzippedDir);
-            File outputDir = getOutputDir(filename);
+            Path outputDir = getOutputDir(filename);
 
-            File minecraftDir = new File(outputDir, "minecraft");
-            if (!minecraftDir.exists())
-                minecraftDir.mkdir();
+            Path minecraftDir = outputDir.resolve("minecraft");
+            if (!Files.exists(minecraftDir)) {
+                Files.createDirectories(minecraftDir);
+            }
 
             downloadModpackFromManifest(minecraftDir, manifest);
             copyOverrides(manifest, unzippedDir, minecraftDir);
@@ -109,20 +119,21 @@ public final class CMPDL {
         }
     }
 
-    public static void setupFromLocalFile(File file) throws Exception {
-        missingMods = new ArrayList<String>();
+    public static void setupFromLocalFile(Path file) throws Exception {
+        missingMods = new ArrayList<>();
         downloading = true;
 
-        String filename = file.getName();
+        String filename = file.getFileName().toString();
         log("Modpack filename is " + filename);
 
-        File unzippedDir = setupLocalModpackMetadata(file);
+        Path unzippedDir = setupLocalModpackMetadata(file);
         Manifest manifest = getManifest(unzippedDir);
-        File outputDir = getOutputDir(filename);
+        Path outputDir = getOutputDir(filename);
 
-        File minecraftDir = new File(outputDir, "minecraft");
-        if (!minecraftDir.exists())
-            minecraftDir.mkdir();
+        Path minecraftDir = outputDir.resolve("minecraft");
+        if (!Files.exists(minecraftDir)) {
+            Files.createDirectories(minecraftDir);
+        }
 
         downloadModpackFromManifest(minecraftDir, manifest);
         copyOverrides(manifest, unzippedDir, minecraftDir);
@@ -131,7 +142,7 @@ public final class CMPDL {
         endSetup(outputDir, manifest);
     }
 
-    public static void endSetup(File outputDir, Manifest manifest) throws IOException {
+    public static void endSetup(Path outputDir, Manifest manifest) throws IOException {
         log("And we're done!");
         log("Output Path: " + outputDir);
         log("");
@@ -146,8 +157,9 @@ public final class CMPDL {
             log("WARNING: Some mods could not be downloaded. Either the specific versions were taken down from "
                     + "public download on CurseForge, or there were errors in the download.");
             log("The missing mods are the following:");
-            for (String mod : missingMods)
+            for (String mod : missingMods) {
                 log(" - " + mod);
+            }
             log("");
             log("If these mods are crucial to the modpack functioning, try downloading the server version of the pack "
                     + "and pulling them from there.");
@@ -158,21 +170,22 @@ public final class CMPDL {
 
         Interface.setStatus("Complete");
 
-        Desktop.getDesktop().open(outputDir);
+        Desktop.getDesktop().open(outputDir.toFile());
     }
 
-    public static File downloadModpackMetadata(String filename, String url) throws IOException, ZipException {
+    public static Path downloadModpackMetadata(String filename, String url) throws IOException {
         Interface.setStatus("Setting up Metadata");
 
         String zipName = filename;
-        if (!zipName.endsWith(".zip"))
+        if (!zipName.endsWith(".zip")) {
             zipName = zipName + ".zip";
+        }
 
-        File retDir = setupTemporaryDirectory(filename);
+        Path retDir = setupTemporaryDirectory(filename);
 
         log("Downloading zip file " + zipName);
         Interface.setStatus("Downloading Modpack .zip");
-        File f = new File(retDir, zipName);
+        Path f = retDir.resolve(zipName);
         downloadFileFromURL(f, new URL(url));
 
         extractModpackMetadata(f, retDir);
@@ -180,77 +193,86 @@ public final class CMPDL {
         return retDir;
     }
 
-    public static File setupLocalModpackMetadata(File file) throws ZipException {
+    public static Path setupLocalModpackMetadata(Path file) throws IOException {
         Interface.setStatus("Setting up Metadata");
 
-        File retDir = setupTemporaryDirectory(file.getName());
+        Path retDir = setupTemporaryDirectory(file.getFileName().toString());
 
         extractModpackMetadata(file, retDir);
 
         return retDir;
     }
 
-    public static File setupTemporaryDirectory(String filename) {
-        File homeDir = getTempDir();
+    public static Path setupTemporaryDirectory(String filename) throws IOException {
+        Path tempDir = Files.createTempDirectory("cmdpl");
+        log("CMPDL Temp Dir is " + tempDir);
+        tempDir.toFile().deleteOnExit();
 
-        File retDir = new File(homeDir, filename);
-        log("Modpack temporary directory is " + retDir);
-        if (!retDir.exists()) {
-            log("Directory doesn't exist, making it now");
-            retDir.mkdir();
-        }
-
-        retDir.deleteOnExit();
-
-        return retDir;
+        return tempDir;
     }
 
-    public static void extractModpackMetadata(File f, File retDir) throws ZipException {
-        String retPath = retDir.getAbsolutePath();
-
+    public static void extractModpackMetadata(Path f, Path retDir) throws IOException {
         Interface.setStatus("Unzipping Modpack Download");
         log("Unzipping file");
-        ZipFile zip = new ZipFile(f);
-        zip.extractAll(retPath);
+
+        try (FileSystem zipFs = FileSystems.newFileSystem(f, null)) {
+            List<Path> roots = new ArrayList<>();
+            zipFs.getRootDirectories().forEach(roots::add);
+
+            if (roots.size() != 1) {
+                throw new RuntimeException("Too many roots in Zip Filesystem, expected 1");
+            }
+
+            Path root = roots.get(0);
+            ExecutorService es = Executors.newFixedThreadPool(Runtime.getRuntime().availableProcessors());
+
+            Files.walk(root).filter(Files::isRegularFile).forEach(p -> {
+                es.submit(() -> {
+                    Path extracted = retDir.resolve(root.relativize(p).toString());
+                    try {
+                        Files.createDirectories(extracted.getParent());
+                        Files.copy(p, extracted, StandardCopyOption.REPLACE_EXISTING);
+                    } catch (IOException e) {
+                        throw new UncheckedIOException(e);
+                    }
+                });
+            });
+
+            es.shutdown();
+
+            try {
+                es.awaitTermination(Long.MAX_VALUE, TimeUnit.NANOSECONDS);
+            } catch (InterruptedException ignored) {
+            }
+        }
 
         log("Done unzipping");
     }
 
-    public static File getTempDir() {
-        String home = System.getProperty("user.home");
-        File homeDir = new File(home, "/.cmpdl_temp");
-
-        log("CMPDL Temp Dir is " + homeDir);
-        if (!homeDir.exists()) {
-            log("Directory doesn't exist, making it now");
-            homeDir.mkdir();
+    public static Manifest getManifest(Path dir) throws IOException {
+        Interface.setStatus("Parsing Manifest");
+        Path f = dir.resolve("manifest.json");
+        if (!Files.exists(f)) {
+            throw new IllegalArgumentException("This modpack has no manifest");
         }
 
-        return homeDir;
-    }
-
-    public static Manifest getManifest(File dir) throws IOException {
-        Interface.setStatus("Parsing Manifest");
-        File f = new File(dir, "manifest.json");
-        if (!f.exists())
-            throw new IllegalArgumentException("This modpack has no manifest");
-
         log("Parsing Manifest");
-        Manifest manifest = GSON_INSTANCE.fromJson(new FileReader(f), Manifest.class);
+        Manifest manifest = GSON_INSTANCE.fromJson(Files.newBufferedReader(f), Manifest.class);
 
         return manifest;
     }
 
-    public static File downloadModpackFromManifest(File outputDir, Manifest manifest) throws IOException, URISyntaxException {
+    public static Path downloadModpackFromManifest(Path outputDir, Manifest manifest) throws IOException, URISyntaxException {
         int total = manifest.files.size();
 
         log("Downloading modpack from Manifest");
         log("Manifest contains " + total + " files to download");
         log("");
 
-        File modsDir = new File(outputDir, "mods");
-        if (!modsDir.exists())
-            modsDir.mkdir();
+        Path modsDir = outputDir.resolve("mods");
+        if (!Files.exists(modsDir)) {
+            Files.createDirectories(modsDir);
+        }
 
         int left = total;
         for (Manifest.FileData f : manifest.files) {
@@ -263,12 +285,12 @@ public final class CMPDL {
         return outputDir;
     }
 
-    public static void copyOverrides(Manifest manifest, File tempDir, File outDir) throws IOException {
+    public static void copyOverrides(Manifest manifest, Path tempDir, Path outDir) throws IOException {
         Interface.setStatus("Copying modpack overrides");
         log("Copying modpack overrides");
-        File overridesDir = new File(tempDir, manifest.overrides);
+        Path overridesDir = tempDir.resolve(manifest.overrides);
 
-        Files.walk(overridesDir.toPath()).forEach(path -> {
+        Files.walk(overridesDir).forEach(path -> {
             try {
                 log("Override: " + path.getFileName());
                 Files.copy(path, Paths.get(path.toString().replace(overridesDir.toString(), outDir.toString())));
@@ -280,15 +302,16 @@ public final class CMPDL {
         log("Done copying overrides");
     }
 
-    public static void setupMultimcInfo(Manifest manifest, File outputDir) throws IOException {
+    public static void setupMultimcInfo(Manifest manifest, Path outputDir) throws IOException {
         log("Setting up MultiMC info");
         Interface.setStatus("Setting up MultiMC info");
 
-        File cfg = new File(outputDir, "instance.cfg");
-        if (!cfg.exists())
-            cfg.createNewFile();
+        Path cfg = outputDir.resolve("instance.cfg");
+        if (!Files.exists(cfg)) {
+            Files.createFile(cfg);
+        }
 
-        try (BufferedWriter writer = new BufferedWriter(new FileWriter(cfg))) {
+        try (BufferedWriter writer = Files.newBufferedWriter(cfg)) {
             writer.write("InstanceType=OneSix\n"
                     + "IntendedVersion=" + manifest.minecraft.version + "\n"
                     + "LogPrePostOutput=true\n"
@@ -306,25 +329,25 @@ public final class CMPDL {
         }
     }
 
-    public static File getOutputDir(String filename) throws IOException, URISyntaxException {
-        File jarFile = new File(CMPDL.class.getProtectionDomain().getCodeSource().getLocation().toURI());
-        String homePath = jarFile.getParentFile().getAbsolutePath();
+    public static Path getOutputDir(String filename) throws IOException, URISyntaxException {
+        Path jarFile = Path.of(CMPDL.class.getProtectionDomain().getCodeSource().getLocation().toURI());
+        Path homePath = jarFile.getParent();
 
-        String outname = URLDecoder.decode(filename, "UTF-8");
-        outname = outname.replaceAll(".zip", "");
-        File outDir = new File(homePath, outname);
+        String outname = URLDecoder.decode(filename, StandardCharsets.UTF_8);
+        outname = outname.replaceAll("\\.zip", "");
+        Path outDir = homePath.resolve(outname);
 
         log("Output Dir is " + outDir);
 
-        if (!outDir.exists()) {
+        if (!Files.exists(outDir)) {
             log("Directory doesn't exist, making it now");
-            outDir.mkdir();
+            Files.createDirectories(outDir);
         }
 
         return outDir;
     }
 
-    public static void downloadFile(Manifest.FileData file, File modsDir, int remaining, int total) throws IOException, URISyntaxException {
+    public static void downloadFile(Manifest.FileData file, Path modsDir, int remaining, int total) throws IOException, URISyntaxException {
         log("Downloading " + file);
         Interface.setStatus("File: " + file + " (" + (total - remaining) + "/" + total + ")");
         Interface.setStatus2("Acquiring Info");
@@ -339,11 +362,12 @@ public final class CMPDL {
 
         String finalUrl = getLocationHeader(fileDlUrl);
         Matcher m = FILE_NAME_URL_PATTERN.matcher(finalUrl);
-        if (!m.matches())
+        if (!m.matches()) {
             throw new IllegalArgumentException("Mod file doesn't match filename pattern");
+        }
 
         String filename = m.group(1);
-        filename = URLDecoder.decode(filename, "UTF-8");
+        filename = URLDecoder.decode(filename, StandardCharsets.UTF_8);
 
         Interface.setStatus2("Downloading");
 
@@ -353,15 +377,16 @@ public final class CMPDL {
         } else {
             log("Downloading " + filename);
 
-            File f = new File(modsDir, filename);
+            Path f = modsDir.resolve(filename);
             try {
                 if (filename.equals("download"))
                     throw new FileNotFoundException("Invalid filename");
 
-                if (f.exists())
+                if (Files.exists(f)) {
                     log("This file already exists. No need to download it");
-                else
+                } else {
                     downloadFileFromURL(f, new URL(finalUrl));
+                }
                 log("Downloaded! " + remaining + "/" + total + " remaining");
             } catch (IOException e) {
                 Interface.addLogLine("Error: " + e.getClass().toString() + ": " + e.getLocalizedMessage());
@@ -376,20 +401,21 @@ public final class CMPDL {
 
     public static String getLocationHeader(String location) throws IOException, URISyntaxException {
         URI uri = new URI(location);
-        HttpURLConnection connection = null;
-        String userAgent = "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Ubuntu Chromium/53.0.2785.143 Chrome/53.0.2785.143 Safari/537.36";
+        HttpURLConnection connection;
+
         for (; ; ) {
             URL url = uri.toURL();
             connection = (HttpURLConnection) url.openConnection();
             connection.setRequestProperty("User-Agent", userAgent);
             connection.setInstanceFollowRedirects(false);
             String redirectLocation = connection.getHeaderField("Location");
-            if (redirectLocation == null)
+            if (redirectLocation == null) {
                 break;
+            }
 
-            if (redirectLocation.startsWith("/"))
+            if (redirectLocation.startsWith("/")) {
                 uri = new URI(uri.getScheme(), uri.getHost(), redirectLocation, uri.getFragment());
-            else {
+            } else {
                 try {
                     uri = new URI(redirectLocation);
                 } catch (URISyntaxException e) {
@@ -402,16 +428,18 @@ public final class CMPDL {
         return uri.toString();
     }
 
-    public static void downloadFileFromURL(File f, URL url) throws IOException, FileNotFoundException {
-        if (!f.exists())
-            f.createNewFile();
+    public static ReadableByteChannel open(URL url) throws IOException {
+        URLConnection conn = url.openConnection();
+        conn.setRequestProperty("User-Agent", userAgent);
+        return Channels.newChannel(conn.getInputStream());
+    }
 
-        try (InputStream instream = url.openStream(); FileOutputStream outStream = new FileOutputStream(f)) {
-            byte[] buff = new byte[4096];
-
-            int i;
-            while ((i = instream.read(buff)) > 0)
-                outStream.write(buff, 0, i);
+    public static void downloadFileFromURL(Path f, URL url) throws IOException {
+        try (
+                ReadableByteChannel in = open(url);
+                FileChannel out = FileChannel.open(f, StandardOpenOption.WRITE, StandardOpenOption.CREATE, StandardOpenOption.TRUNCATE_EXISTING);
+        ) {
+            out.transferFrom(in, 0, Long.MAX_VALUE);
         }
     }
 

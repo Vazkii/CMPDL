@@ -1,12 +1,12 @@
 package vazkii.cmpdl;
 
-import java.io.File;
+import java.nio.file.Path;
 
 public class OperatorThread extends Thread {
 
     String url;
     String version;
-    File file;
+    Path file;
 
     public OperatorThread(String url, String version) {
         this.url = url;
@@ -16,7 +16,7 @@ public class OperatorThread extends Thread {
         start();
     }
 
-    public OperatorThread(File file) {
+    public OperatorThread(Path file) {
         this.file = file;
         setName("Operator");
         setDaemon(true);
@@ -32,8 +32,9 @@ public class OperatorThread extends Thread {
             CMPDL.downloadFromURL(url, version);
         } catch (Exception ex) {
             Interface.addLogLine("Error: " + ex.getClass().toString() + ": " + ex.getLocalizedMessage());
-            for (StackTraceElement e : ex.getStackTrace())
+            for (StackTraceElement e : ex.getStackTrace()) {
                 Interface.addLogLine(e.toString());
+            }
 
             ex.printStackTrace();
 
