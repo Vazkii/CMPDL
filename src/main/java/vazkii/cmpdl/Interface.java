@@ -9,9 +9,8 @@ import java.nio.file.Path;
 
 public class Interface {
 
-    private static Frame frame;
     public static OperatorThread operatorThread;
-
+    private static Frame frame;
     private static String line1 = "";
     private static String line2 = "";
 
@@ -85,10 +84,8 @@ public class Interface {
         JButton chooseFileButton;
         JFileChooser fileChooser;
         JLabel urlLabel;
-        JLabel versionLabel;
         JScrollPane scrollPane;
         JTextField urlField;
-        JTextField versionField;
         JTextArea logArea;
         JLabel currentStatus;
         JButton clearButton;
@@ -116,9 +113,7 @@ public class Interface {
             chooseFileButton.setAlignmentX(CENTER_ALIGNMENT);
             fileChooser = new JFileChooser();
             urlLabel = new JLabel("Modpack URL :");
-            urlField = new JTextField("", 54);
-            versionLabel = new JLabel("Curse File ID :");
-            versionField = new JTextField("", 20);
+            urlField = new JTextField("", 68);
 
             logArea = new JTextArea(34, 68);
             logArea.setBackground(Color.WHITE);
@@ -150,11 +145,6 @@ public class Interface {
             urlPanel.add(urlField);
             urlPanel.setBorder(BorderFactory.createEmptyBorder(10, 10, 10, 10));
 
-            versionPanel.add(versionLabel);
-            versionPanel.add(Box.createRigidArea(new Dimension(26, 5)));
-            versionPanel.setBorder(BorderFactory.createEmptyBorder(10, 10, 10, 10));
-            versionPanel.add(versionField);
-
             downloadPanel.add(urlPanel);
             downloadPanel.add(versionPanel);
             panel.add(downloadPanel);
@@ -174,7 +164,6 @@ public class Interface {
             downloadButton.addActionListener(this);
             chooseFileButton.addActionListener(this);
             urlField.addKeyListener(this);
-            versionField.addKeyListener(this);
 
             addWindowListener(new WindowAdapter() {
                 @Override
@@ -209,9 +198,8 @@ public class Interface {
                     Interface.setStatus("Stopped Manually");
                 } else {
                     String url = urlField.getText();
-                    String version = versionField.getText();
                     if (url != null && !url.isEmpty() && !downloading) {
-                        operatorThread = new OperatorThread(url, version);
+                        operatorThread = new OperatorThread(url);
                         setStopButtonVisibility(true);
                     }
                 }

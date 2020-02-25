@@ -5,20 +5,18 @@ import java.nio.file.Path;
 public class OperatorThread extends Thread {
 
     String url;
-    String version;
     Path file;
 
-    public OperatorThread(String url, String version) {
+    public OperatorThread(String url) {
         this.url = url;
-        this.version = version;
-        setName("Operator");
+        setName("CMPDL Operator");
         setDaemon(true);
         start();
     }
 
     public OperatorThread(Path file) {
         this.file = file;
-        setName("Operator");
+        setName("CMPDL Operator");
         setDaemon(true);
         start();
     }
@@ -28,8 +26,9 @@ public class OperatorThread extends Thread {
         try {
             if (file != null) {
                 CMPDL.setupFromLocalFile(file);
+            } else {
+                CMPDL.downloadFromURL(url);
             }
-            CMPDL.downloadFromURL(url, version);
         } catch (Exception ex) {
             Interface.addLogLine("Error: " + ex.getClass().toString() + ": " + ex.getLocalizedMessage());
             for (StackTraceElement e : ex.getStackTrace()) {

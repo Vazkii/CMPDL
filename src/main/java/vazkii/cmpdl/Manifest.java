@@ -48,7 +48,7 @@ public class Manifest {
 
         @Override
         public String toString() {
-            return projectID + "/" + fileID;
+            return "project=" + projectID + " / file=" + fileID;
         }
 
     }
