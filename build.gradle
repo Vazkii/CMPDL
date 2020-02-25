@@ -6,7 +6,7 @@ plugins {
 group 'vazkii'
 version '1.0.0-SNAPSHOT'
 
-sourceCompatibility = JavaVersion.VERSION_13
+sourceCompatibility = JavaVersion.VERSION_1_8
 
 repositories {
     mavenCentral()

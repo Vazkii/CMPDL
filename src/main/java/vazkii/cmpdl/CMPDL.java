@@ -17,7 +17,6 @@ import java.nio.file.FileSystem;
 import java.nio.file.*;
 import java.util.ArrayList;
 import java.util.List;
-import java.util.Map;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.TimeUnit;
@@ -167,7 +166,7 @@ public final class CMPDL {
 
         String url = resolveModpackUrl(pack, version);
 
-        String zipName = URLDecoder.decode(url.substring(url.lastIndexOf('/') + 1), StandardCharsets.UTF_8);
+        String zipName = URLDecoder.decode(url.substring(url.lastIndexOf('/') + 1), StandardCharsets.UTF_8.name());
         String extractedName = zipName.replaceAll("\\.zip", "");
         Path zipFile = tmpDir.resolve(zipName);
         Path extractedDir = tmpDir.resolve(extractedName);
@@ -202,7 +201,7 @@ public final class CMPDL {
     }
 
     public static Path setupTempDir() throws IOException {
-        Path userHome = Path.of(System.getProperty("user.home"));
+        Path userHome = Paths.get(System.getProperty("user.home"));
         Path tmpDir = userHome.resolve(".cmpdl").toAbsolutePath().normalize();
         Files.createDirectories(tmpDir);
         log("CMPDL Temp Dir is " + tmpDir);
@@ -213,7 +212,7 @@ public final class CMPDL {
         Interface.setStatus("Unzipping Modpack Download");
         log("Unzipping file");
 
-        try (FileSystem zipFs = FileSystems.newFileSystem(zipFile, Map.of(), null)) {
+        try (FileSystem zipFs = FileSystems.newFileSystem(zipFile, (ClassLoader) null)) {
             List<Path> roots = new ArrayList<>();
             zipFs.getRootDirectories().forEach(roots::add);
 
@@ -326,10 +325,10 @@ public final class CMPDL {
     }
 
     public static Path getOutputDir(String fileName) throws IOException, URISyntaxException {
-        Path jarFile = Path.of(CMPDL.class.getProtectionDomain().getCodeSource().getLocation().toURI());
+        Path jarFile = Paths.get(CMPDL.class.getProtectionDomain().getCodeSource().getLocation().toURI());
         Path homePath = jarFile.getParent();
 
-        String outname = URLDecoder.decode(fileName, StandardCharsets.UTF_8);
+        String outname = URLDecoder.decode(fileName, StandardCharsets.UTF_8.name());
         outname = outname.replaceAll("\\.zip", "");
         Path outDir = homePath.resolve(outname);
 
@@ -351,7 +350,7 @@ public final class CMPDL {
         String url = resolveModUrl(fileData.projectID, fileData.fileID);
         log("File download URL is " + url);
 
-        String fileName = URLDecoder.decode(url.substring(url.lastIndexOf('/') + 1), StandardCharsets.UTF_8);
+        String fileName = URLDecoder.decode(url.substring(url.lastIndexOf('/') + 1), StandardCharsets.UTF_8.name());
 
         Interface.setStatus2("Downloading " + fileName);
 
