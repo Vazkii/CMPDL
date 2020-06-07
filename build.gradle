@@ -4,7 +4,7 @@ plugins {
 }
 
 group 'vazkii'
-version '1.0.0-SNAPSHOT'
+version '1.3.0'
 
 sourceCompatibility = JavaVersion.VERSION_1_8
 
