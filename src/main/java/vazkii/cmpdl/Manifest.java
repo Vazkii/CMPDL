@@ -12,7 +12,6 @@ public class Manifest {
     public String name;
     public String version;
     public String author;
-    public int projectID;
     public List<FileData> files;
     public String overrides;
 
@@ -37,7 +36,6 @@ public class Manifest {
             public boolean primary;
 
         }
-
     }
 
     public static class FileData {
@@ -50,7 +48,5 @@ public class Manifest {
         public String toString() {
             return "project=" + projectID + " / file=" + fileID;
         }
-
     }
-
 }

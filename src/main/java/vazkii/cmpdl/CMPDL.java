@@ -16,7 +16,9 @@ import java.nio.charset.StandardCharsets;
 import java.nio.file.FileSystem;
 import java.nio.file.*;
 import java.util.ArrayList;
+import java.util.Comparator;
 import java.util.List;
+import java.util.Objects;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.TimeUnit;
@@ -26,13 +28,15 @@ import java.util.regex.Pattern;
 public final class CMPDL {
 
     private static final Gson GSON = new GsonBuilder().create();
-    private static final Pattern CURSE_FORGE_MOD_PACK_PATTERN = Pattern.compile("https://www\\.curseforge\\.com/minecraft/modpacks/(?<pack>[0-9a-z-]+)/(?:(?:files)|(?:download))/(?<version>\\d+)(?:/file)?/?");
+    private static final Pattern CURSE_FORGE_MOD_PACK_PATTERN = Pattern.compile("https://www\\.curseforge\\" +
+            ".com/minecraft/modpacks/(?<pack>[0-9a-z-]+)/(?:(?:files)|(?:download))/(?<version>\\d+)(?:/file)?/?");
     private static final String META_URL = "https://addons-ecs.forgesvc.net/api/v2/addon/0/file/%s/download-url";
-    private static final String MOD_URL = "https://addons-ecs.forgesvc.net/api/v2/addon/%s/file/%s/download-url";
-    private static final String USER_AGENT = "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Ubuntu Chromium/53.0.2785.143 Chrome/53.0.2785.143 Safari/537.36";
+    private static final String MOD_URL = "https://addons-ecs.forgesvc.net/api/v2/addon/%s/file/%s";
+    private static final String USER_AGENT = "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) " +
+            "Ubuntu Chromium/53.0.2785.143 Chrome/53.0.2785.143 Safari/537.36";
 
     public static boolean downloading = false;
-    public static List<String> missingMods = null;
+    public static List<Addon> missingMods = null;
 
     private CMPDL() {
     }
@@ -144,8 +148,8 @@ public final class CMPDL {
             log("WARNING: Some mods could not be downloaded. Either the specific versions were taken down from "
                     + "public download on CurseForge, or there were errors in the download.");
             log("The missing mods are the following:");
-            for (String mod : missingMods) {
-                log(" - " + mod);
+            for (Addon addon : missingMods) {
+                log(" - " + addon);
             }
             log("");
             log("If these mods are crucial to the modpack functioning, try downloading the server version of the "
@@ -210,8 +214,19 @@ public final class CMPDL {
 
     public static void extractModpackMetadata(Path zipFile, Path extractDir) throws IOException {
         Interface.setStatus("Unzipping Modpack Download");
-        log("Unzipping file");
 
+        log("Cleaning up extract dir");
+        Files.walk(extractDir)
+                .sorted(Comparator.reverseOrder())
+                .forEachOrdered(path -> {
+                    try {
+                        Files.deleteIfExists(path);
+                    } catch (IOException e) {
+                        throw new UncheckedIOException(e);
+                    }
+                });
+
+        log("Unzipping file");
         try (FileSystem zipFs = FileSystems.newFileSystem(zipFile, (ClassLoader) null)) {
             List<Path> roots = new ArrayList<>();
             zipFs.getRootDirectories().forEach(roots::add);
@@ -256,22 +271,18 @@ public final class CMPDL {
         return GSON.fromJson(Files.newBufferedReader(manifestFile), Manifest.class);
     }
 
-    public static Path downloadModpackFromManifest(Path outputDir, Manifest manifest) throws IOException, URISyntaxException {
+    public static Path downloadModpackFromManifest(Path outputDir, Manifest manifest) throws IOException,
+            URISyntaxException {
         int total = manifest.files.size();
 
         log("Downloading modpack from Manifest");
         log("Manifest contains " + total + " files to download");
         log("");
 
-        Path modsDir = outputDir.resolve("mods");
-        if (!Files.exists(modsDir)) {
-            Files.createDirectories(modsDir);
-        }
-
         int left = total;
         for (Manifest.FileData f : manifest.files) {
             left--;
-            downloadFile(f, modsDir, left, total);
+            downloadFile(f, outputDir, left, total);
         }
 
         log("Mod downloads complete");
@@ -342,31 +353,43 @@ public final class CMPDL {
         return outDir.toAbsolutePath().normalize();
     }
 
-    public static void downloadFile(Manifest.FileData fileData, Path modsDir, int remaining, int total) throws IOException, URISyntaxException {
+    public static void downloadFile(Manifest.FileData fileData, Path outputDir, int remaining, int total) throws IOException, URISyntaxException {
         log("Downloading file data " + fileData);
         Interface.setStatus("File: " + fileData + " (" + (total - remaining) + "/" + total + ")");
         Interface.setStatus2("Acquiring Info");
 
-        String url = resolveModUrl(fileData.projectID, fileData.fileID);
+        Addon addon = resolveModUrl(fileData.projectID, fileData.fileID);
+
+        String url = addon.downloadUrl;
         log("File download URL is " + url);
 
-        String fileName = URLDecoder.decode(url.substring(url.lastIndexOf('/') + 1), StandardCharsets.UTF_8.name());
-
+        String fileName = addon.fileName;
         Interface.setStatus2("Downloading " + fileName);
 
-        Path file = modsDir.resolve(fileName);
+        String installDir_ = addon.guessInstallDir();
+        log("Installing to " + installDir_);
+
+        Path installDir = outputDir.resolve(installDir_);
+        if (!Files.exists(installDir)) {
+            Files.createDirectories(installDir);
+        }
+        Path file = installDir.resolve(fileName);
+
         try {
             if (Files.exists(file)) {
                 log("This file already exists. No need to download it");
             } else {
                 downloadFileFromURL(file, new URL(url));
+                log("Downloaded!");
             }
-            log("Downloaded! " + remaining + "/" + total + " remaining");
-        } catch (IOException e) {
-            Interface.addLogLine("Error: " + e.getClass().toString() + ": " + e.getLocalizedMessage());
-            Interface.addLogLine("This mod will not be downloaded. If you need the file, you'll have to get it manually:");
-            Interface.addLogLine(url);
-            missingMods.add(fileData.toString());
+            log(remaining + "/" + total + " remaining");
+        } catch (Exception e) {
+            log("Error: " + e.getClass().toString() + ": " + e.getLocalizedMessage());
+            log("This mod will not be downloaded. If you need the file, you'll have to get it " +
+                    "manually:");
+            log(Objects.toString(addon));
+            missingMods.add(addon);
+            e.printStackTrace();
         }
 
         log("");
@@ -381,13 +404,13 @@ public final class CMPDL {
         return lines.get(0);
     }
 
-    private static String resolveModUrl(int project, int version) throws IOException {
+    private static Addon resolveModUrl(int project, int version) throws IOException {
         URL url = new URL(String.format(MOD_URL, project, version));
         List<String> lines = readLinesFromURL(url);
         if (lines.size() != 1) {
             throw new RuntimeException();
         }
-        return lines.get(0);
+        return GSON.fromJson(String.join("\n", lines), Addon.class);
     }
 
     public static ReadableByteChannel open(URL url) throws IOException {
@@ -416,7 +439,8 @@ public final class CMPDL {
     public static void downloadFileFromURL(Path f, URL url) throws IOException {
         try (
                 ReadableByteChannel in = open(url);
-                FileChannel out = FileChannel.open(f, StandardOpenOption.WRITE, StandardOpenOption.CREATE, StandardOpenOption.TRUNCATE_EXISTING)
+                FileChannel out = FileChannel.open(f, StandardOpenOption.WRITE, StandardOpenOption.CREATE,
+                        StandardOpenOption.TRUNCATE_EXISTING)
         ) {
             out.transferFrom(in, 0, Long.MAX_VALUE);
         }
