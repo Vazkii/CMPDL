@@ -215,16 +215,18 @@ public final class CMPDL {
     public static void extractModpackMetadata(Path zipFile, Path extractDir) throws IOException {
         Interface.setStatus("Unzipping Modpack Download");
 
-        log("Cleaning up extract dir");
-        Files.walk(extractDir)
-                .sorted(Comparator.reverseOrder())
-                .forEachOrdered(path -> {
-                    try {
-                        Files.deleteIfExists(path);
-                    } catch (IOException e) {
-                        throw new UncheckedIOException(e);
-                    }
-                });
+        if (Files.exists(extractDir)) {
+            log("Cleaning up extract dir");
+            Files.walk(extractDir)
+                    .sorted(Comparator.reverseOrder())
+                    .forEachOrdered(path -> {
+                        try {
+                            Files.deleteIfExists(path);
+                        } catch (IOException e) {
+                            throw new UncheckedIOException(e);
+                        }
+                    });
+        }
 
         log("Unzipping file");
         try (FileSystem zipFs = FileSystems.newFileSystem(zipFile, (ClassLoader) null)) {
