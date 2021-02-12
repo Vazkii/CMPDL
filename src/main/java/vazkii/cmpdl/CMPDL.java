@@ -1,7 +1,6 @@
 package vazkii.cmpdl;
 
-import com.google.gson.Gson;
-import com.google.gson.GsonBuilder;
+import okio.Okio;
 
 import java.awt.*;
 import java.io.*;
@@ -18,25 +17,32 @@ import java.nio.file.*;
 import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.List;
-import java.util.Objects;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
-import java.util.concurrent.TimeUnit;
+import java.util.concurrent.Future;
+import java.util.concurrent.atomic.AtomicInteger;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
+import java.util.stream.Collectors;
+import java.util.stream.Stream;
 
 public final class CMPDL {
 
-    private static final Gson GSON = new GsonBuilder().create();
-    private static final Pattern CURSE_FORGE_MOD_PACK_PATTERN = Pattern.compile("https://www\\.curseforge\\" +
-            ".com/minecraft/modpacks/(?<pack>[0-9a-z-]+)/(?:(?:files)|(?:download))/(?<version>\\d+)(?:/file)?/?");
+    private static final Pattern CURSE_FORGE_MOD_PACK_PATTERN = Pattern.compile(
+            "https://www\\.curseforge\\.com/minecraft/modpacks/(?<pack>[0-9a-z-]+)/(?:(?:files)|(?:download))/" +
+                    "(?<version>\\d+)(?:/file)?/?"
+    );
     private static final String META_URL = "https://addons-ecs.forgesvc.net/api/v2/addon/0/file/%s/download-url";
     private static final String MOD_URL = "https://addons-ecs.forgesvc.net/api/v2/addon/%s/file/%s";
-    private static final String USER_AGENT = "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) " +
-            "Ubuntu Chromium/53.0.2785.143 Chrome/53.0.2785.143 Safari/537.36";
+    private static final String USER_AGENT =
+            "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Ubuntu Chromium/53.0.2785.143 " +
+                    "Chrome/53.0.2785.143 Safari/537.36";
 
+    private static final Object lock = new Object();
+    private static final ExecutorService executorService = Executors.newCachedThreadPool();
+
+    public static final List<Addon> missingMods = new ArrayList<>();
     public static boolean downloading = false;
-    public static List<Addon> missingMods = null;
 
     private CMPDL() {
     }
@@ -66,7 +72,7 @@ public final class CMPDL {
             return;
         }
 
-        missingMods = new ArrayList<>();
+        missingMods.clear();
         downloading = true;
         log("~ Starting magical modpack download sequence ~");
         log("Input URL: " + url);
@@ -99,7 +105,7 @@ public final class CMPDL {
             return;
         }
 
-        missingMods = new ArrayList<>();
+        missingMods.clear();
         downloading = true;
 
         String fileName = file.getFileName().toString();
@@ -126,7 +132,7 @@ public final class CMPDL {
 
         downloadModpackFromManifest(minecraftDir, manifest);
         copyOverrides(manifest, extractedDir, minecraftDir);
-        setupMultimcInfo(manifest, outputDir);
+        setupMultiMcInfo(manifest, outputDir);
 
         Interface.finishDownload(false);
 
@@ -155,7 +161,7 @@ public final class CMPDL {
             log("If these mods are crucial to the modpack functioning, try downloading the server version of the "
                     + "pack and pulling them from there.");
         }
-        missingMods = null;
+        missingMods.clear();
 
         log("################################################################################################");
 
@@ -238,24 +244,28 @@ public final class CMPDL {
             }
 
             Path root = roots.get(0);
-            ExecutorService es = Executors.newFixedThreadPool(Runtime.getRuntime().availableProcessors());
+            try (Stream<Path> stream = Files.walk(root)) {
+                List<? extends Future<?>> futures = stream
+                        .filter(Files::isRegularFile)
+                        .map(p -> executorService.submit(() -> {
+                            Path extracted = extractDir.resolve(root.relativize(p).toString());
+                            System.out.println(p + " -> " + extracted);
+                            try {
+                                Files.createDirectories(extracted.getParent());
+                                Files.copy(p, extracted, StandardCopyOption.REPLACE_EXISTING);
+                            } catch (IOException e) {
+                                throw new UncheckedIOException(e);
+                            }
+                        }))
+                        .collect(Collectors.toList());
 
-            Files.walk(root).filter(Files::isRegularFile).forEach(p -> es.submit(() -> {
-                Path extracted = extractDir.resolve(root.relativize(p).toString());
-                System.out.println(p + " -> " + extracted);
-                try {
-                    Files.createDirectories(extracted.getParent());
-                    Files.copy(p, extracted, StandardCopyOption.REPLACE_EXISTING);
-                } catch (IOException e) {
-                    throw new UncheckedIOException(e);
-                }
-            }));
-
-            es.shutdown();
-
-            try {
-                es.awaitTermination(Long.MAX_VALUE, TimeUnit.NANOSECONDS);
-            } catch (InterruptedException ignored) {
+                futures.forEach(f -> {
+                    try {
+                        f.get();
+                    } catch (Exception e) {
+                        throw new RuntimeException(e);
+                    }
+                });
             }
         }
 
@@ -270,55 +280,91 @@ public final class CMPDL {
         }
 
         log("Parsing Manifest");
-        return GSON.fromJson(Files.newBufferedReader(manifestFile), Manifest.class);
+        return Manifest.ADAPTER.fromJson(Okio.buffer(Okio.source(manifestFile)));
     }
 
-    public static Path downloadModpackFromManifest(Path outputDir, Manifest manifest) throws IOException,
-            URISyntaxException {
+    public static Path downloadModpackFromManifest(Path outputDir, Manifest manifest) throws IOException {
         int total = manifest.files.size();
+
+        Interface.setStatus("Downloading " + total + " files");
 
         log("Downloading modpack from Manifest");
         log("Manifest contains " + total + " files to download");
-        log("");
 
-        int left = total;
-        for (Manifest.FileData f : manifest.files) {
-            left--;
-            downloadFile(f, outputDir, left, total);
-        }
+        AtomicInteger remaining = new AtomicInteger(total);
+        List<? extends Future<?>> futures = manifest.files.stream()
+                .map(f -> executorService.submit(() -> downloadFile(f, outputDir, remaining)))
+                .collect(Collectors.toList());
+
+        futures.forEach(f -> {
+            try {
+                f.get();
+            } catch (Exception e) {
+                log("Error: " + e.getClass().toString() + ": " + e.getLocalizedMessage());
+                e.printStackTrace();
+            }
+        });
 
         log("Mod downloads complete");
+        log("");
 
         return outputDir;
     }
 
     public static void copyOverrides(Manifest manifest, Path extractedDir, Path outDir) throws IOException {
-        Interface.setStatus("Copying modpack overrides");
-        log("Copying modpack overrides");
-        Path overridesDir = extractedDir.resolve(manifest.overrides);
+        Interface.setStatus("Handling modpack overrides");
+        log("Handling modpack overrides");
+        Interface.setStatus2("Collecting overrides");
 
-        Files.walk(overridesDir).filter(Files::isRegularFile).forEach(p -> {
-            log("Override: " + p.getFileName());
-            Path copied = outDir.resolve(overridesDir.relativize(p));
+        Path overridesDir = extractedDir.resolve(manifest.overrides);
+        List<Path> overrides;
+        try (Stream<Path> stream = Files.walk(overridesDir)) {
+            overrides = stream
+                    .filter(Files::isRegularFile)
+                    .collect(Collectors.toList());
+        }
+
+        AtomicInteger remaining = new AtomicInteger(overrides.size());
+        Interface.setStatus2("Copying " + remaining.get() + " overrides");
+        log("Copying " + remaining.get() + " overrides");
+
+        List<? extends Future<?>> futures = overrides.stream()
+                .map(p -> executorService.submit(() -> {
+                    Path copied = outDir.resolve(overridesDir.relativize(p));
+                    try {
+                        Files.createDirectories(copied.getParent());
+                        Files.copy(p, copied, StandardCopyOption.REPLACE_EXISTING);
+                    } catch (IOException e) {
+                        throw new UncheckedIOException(e);
+                    }
+
+                    int newRemaining = remaining.decrementAndGet();
+                    if (newRemaining % 10 == 0) {
+                        synchronized (lock) {
+                            log("Remaining: " + newRemaining);
+                        }
+                    }
+                }))
+                .collect(Collectors.toList());
+
+        futures.forEach(f -> {
             try {
-                Files.createDirectories(copied.getParent());
-                Files.copy(p, copied, StandardCopyOption.REPLACE_EXISTING);
-            } catch (IOException e) {
-                throw new UncheckedIOException(e);
+                f.get();
+            } catch (Exception e) {
+                log("Error: " + e.getClass().toString() + ": " + e.getLocalizedMessage());
+                e.printStackTrace();
             }
         });
+
         log("Done copying overrides");
+        log("");
     }
 
-    public static void setupMultimcInfo(Manifest manifest, Path outputDir) throws IOException {
+    public static void setupMultiMcInfo(Manifest manifest, Path outputDir) throws IOException {
         log("Setting up MultiMC info");
         Interface.setStatus("Setting up MultiMC info");
 
         Path cfg = outputDir.resolve("instance.cfg");
-        if (!Files.exists(cfg)) {
-            Files.createFile(cfg);
-        }
-
         try (BufferedWriter writer = Files.newBufferedWriter(cfg)) {
             writer.write("InstanceType=OneSix\n"
                     + "IntendedVersion=" + manifest.minecraft.version + "\n"
@@ -335,6 +381,8 @@ public final class CMPDL {
                     + "notes=Modpack by " + manifest.author + ". Generated by CMPDL. Using Forge " + manifest.getForgeVersion() + ".\n"
                     + "totalTimePlayed=0\n");
         }
+
+        log("");
     }
 
     public static Path getOutputDir(String fileName) throws IOException, URISyntaxException {
@@ -355,46 +403,46 @@ public final class CMPDL {
         return outDir.toAbsolutePath().normalize();
     }
 
-    public static void downloadFile(Manifest.FileData fileData, Path outputDir, int remaining, int total) throws IOException, URISyntaxException {
-        log("Downloading file data " + fileData);
-        Interface.setStatus("File: " + fileData + " (" + (total - remaining) + "/" + total + ")");
-        Interface.setStatus2("Acquiring Info");
-
-        Addon addon = resolveModUrl(fileData.projectID, fileData.fileID);
-
-        String url = addon.downloadUrl;
-        log("File download URL is " + url);
-
-        String fileName = addon.fileName;
-        Interface.setStatus2("Downloading " + fileName);
-
-        String installDir_ = addon.guessInstallDir();
-        log("Installing to " + installDir_);
-
-        Path installDir = outputDir.resolve(installDir_);
-        if (!Files.exists(installDir)) {
-            Files.createDirectories(installDir);
-        }
-        Path file = installDir.resolve(fileName);
-
+    public static void downloadFile(Manifest.FileData fileData, Path outputDir, AtomicInteger remaining) {
+        Addon addon = null;
         try {
-            if (Files.exists(file)) {
-                log("This file already exists. No need to download it");
-            } else {
-                downloadFileFromURL(file, new URL(url));
-                log("Downloaded!");
-            }
-            log(remaining + "/" + total + " remaining");
-        } catch (Exception e) {
-            log("Error: " + e.getClass().toString() + ": " + e.getLocalizedMessage());
-            log("This mod will not be downloaded. If you need the file, you'll have to get it " +
-                    "manually:");
-            log(Objects.toString(addon));
-            missingMods.add(addon);
-            e.printStackTrace();
-        }
+            addon = resolveModUrl(fileData.projectID, fileData.fileID);
 
-        log("");
+            String url = addon.downloadUrl;
+            String fileName = addon.fileName;
+            String installDir_ = addon.guessInstallDir();
+
+            Path installDir = outputDir.resolve(installDir_);
+            try {
+                Files.createDirectories(installDir);
+            } catch (Exception ignored) {
+            }
+
+            Path file = installDir.resolve(fileName);
+            if (!Files.exists(file)) {
+                downloadFileFromURL(file, new URL(url));
+            }
+
+            int newRemaining = remaining.decrementAndGet();
+            if (newRemaining % 10 == 0) {
+                synchronized (lock) {
+                    log("Remaining: " + newRemaining);
+                }
+            }
+        } catch (Exception e) {
+            synchronized (lock) {
+                log("This mod will not be downloaded. If you need the file, you'll have to get it manually:");
+                if (addon != null) {
+                    log(addon.toString());
+                    missingMods.add(addon);
+                } else {
+                    log(fileData.toString());
+                }
+                log("");
+            }
+
+            throw new RuntimeException(e);
+        }
     }
 
     private static String resolveModpackUrl(String pack, String version) throws IOException {
@@ -403,6 +451,7 @@ public final class CMPDL {
         if (lines.size() != 1) {
             throw new RuntimeException();
         }
+
         return lines.get(0);
     }
 
@@ -412,7 +461,8 @@ public final class CMPDL {
         if (lines.size() != 1) {
             throw new RuntimeException();
         }
-        return GSON.fromJson(String.join("\n", lines), Addon.class);
+
+        return Addon.ADAPTER.fromJson(String.join("\n", lines));
     }
 
     public static ReadableByteChannel open(URL url) throws IOException {

@@ -1,10 +1,14 @@
 package vazkii.cmpdl;
 
+import com.squareup.moshi.JsonAdapter;
+import com.squareup.moshi.Moshi;
 import vazkii.cmpdl.Manifest.MinecraftData.Modloader;
 
 import java.util.List;
 
 public class Manifest {
+
+    public static final JsonAdapter<Manifest> ADAPTER = new Moshi.Builder().build().adapter(Manifest.class);
 
     public MinecraftData minecraft;
     public String manifestType;

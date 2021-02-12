@@ -120,7 +120,8 @@ public class Interface {
             logArea.setEditable(false);
             logArea.setLineWrap(true);
 
-            scrollPane = new JScrollPane(logArea, JScrollPane.VERTICAL_SCROLLBAR_ALWAYS, JScrollPane.HORIZONTAL_SCROLLBAR_NEVER);
+            scrollPane = new JScrollPane(logArea, JScrollPane.VERTICAL_SCROLLBAR_ALWAYS,
+                    JScrollPane.HORIZONTAL_SCROLLBAR_NEVER);
 
             Border scrollBorder = BorderFactory.createCompoundBorder(BorderFactory.createEmptyBorder(10, 10, 10, 10),
                     BorderFactory.createLineBorder(Color.GRAY, 1));
