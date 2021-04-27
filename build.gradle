@@ -1,14 +1,14 @@
 plugins {
     id 'java'
     id 'application'
-    id 'com.github.johnrengelman.shadow' version '6.1.0'
+    id 'com.github.johnrengelman.shadow' version '7.0.0'
 }
 
 group 'vazkii'
 version '1.4.0'
 
 wrapper {
-    gradleVersion '6.8.3'
+    gradleVersion '7.0'
 }
 
 java {
@@ -24,5 +24,5 @@ dependencies {
 }
 
 application {
-    mainClassName = 'vazkii.cmpdl.CMPDL'
+    mainClass = 'vazkii.cmpdl.CMPDL'
 }
