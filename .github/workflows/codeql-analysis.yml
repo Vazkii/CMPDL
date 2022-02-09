@@ -27,15 +27,12 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        os: [ ubuntu-latest ]
-        java-version: [ 8 ]
-        distribution: [ adopt ]
         language: [ 'java' ]
         # CodeQL supports [ 'cpp', 'csharp', 'go', 'java', 'javascript', 'python' ]
         # Learn more:
         # https://docs.github.com/en/free-pro-team@latest/github/finding-security-vulnerabilities-and-errors-in-your-code/configuring-code-scanning#changing-the-languages-that-are-analyzed
 
-    runs-on: ${{ matrix.os }}
+    runs-on: ubuntu-latest
 
     steps:
       - name: Checkout Repository
@@ -50,8 +47,8 @@ jobs:
       - name: Setup Java
         uses: actions/setup-java@v2
         with:
-          java-version: ${{ matrix.java-version }}
-          distribution: ${{ matrix.distribution }}
+          java-version: 8
+          distribution: adopt
 
       - name: Load Cache
         uses: actions/cache@v2
