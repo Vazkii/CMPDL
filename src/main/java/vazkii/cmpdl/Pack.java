@@ -30,26 +30,31 @@ public class Pack {
     }
 
     public static class Pagination {
-        public int index;
-        public int pageSize;
         public int resultCount;
-        public int totalCount;
     }
 
     public List<Data> data;
     public Pagination pagination;
 
-    public Optional<String> getZipDownload() {
-        return this.data.get(0).latestFiles.stream()
-                .max(Comparator.comparing(Addon.Data::getId))
-                .map(s -> s.downloadUrl)
-                .stream().findFirst();
+
+    private Data getData() {
+        return this.data.stream().findFirst().orElseThrow(RuntimeException::new);
     }
 
-    public Optional<Integer> getModpackId() {
-        return this.data.get(0).latestFiles.stream()
+    public String getZipDownload() {
+        if (pagination.resultCount > 1) {
+            throw new RuntimeException("MORE THEN 1 MODPACK FOUND BY PROVIDED SLUG");
+        }
+
+        return getData().latestFiles.stream()
                 .max(Comparator.comparing(Addon.Data::getId))
-                .map(s -> s.id)
-                .stream().findFirst();
+                .map(s -> s.downloadUrl)
+                .stream()
+                .findFirst()
+                .orElseThrow(RuntimeException::new);
+    }
+
+    public Integer getModpackId() {
+        return Optional.of(getData().id).orElseThrow(RuntimeException::new);
     }
 }

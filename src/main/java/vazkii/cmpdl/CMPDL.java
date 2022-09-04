@@ -24,7 +24,7 @@ import java.util.stream.Stream;
 
 public final class CMPDL {
 
-    private static final Pattern CURSE_FORGE_MOD_PACK_PATTERN = Pattern.compile("https://www\\.curseforge\\.com/minecraft/modpacks/(?<pack>[\\da-z-]+)(?:/(?:files|download)/(?<fileId>\\d+))?");
+    private static final Pattern CURSE_FORGE_MOD_PACK_PATTERN = Pattern.compile("https://www\\.curseforge\\.com/minecraft/modpacks/(?<slug>[\\da-z-]+)(?:/(?:files|download)/(?<fileId>\\d+))?");
     private static final String META_URL = "https://api.curseforge.com/v1/mods/search?gameId=432&slug=%s";
     private static final String MOD_URL = "https://api.curseforge.com/v1/mods/%s/files/%s";
     private static final String USER_AGENT = "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Ubuntu Chromium/53.0.2785.143 Chrome/53.0.2785.143 Safari/537.36";
@@ -78,15 +78,15 @@ public final class CMPDL {
             return;
         }
 
-        String pack = matcher.group("pack");
+        String slug = matcher.group("slug");
         String fileId = matcher.group("fileId");
 
-        log("Modpack Name: " + pack);
+        log("Modpack Name: " + slug);
         log("");
 
         Path tmpDir = setupTempDir();
 
-        Path extractedDir = downloadModpackMetadata(pack, tmpDir);
+        Path extractedDir = downloadModpackMetadata(slug, fileId, tmpDir);
 
         doSetup(extractedDir, extractedDir.getFileName().toString());
     }
@@ -161,11 +161,13 @@ public final class CMPDL {
         Desktop.getDesktop().open(outputDir.toFile());
     }
 
-    public static Path downloadModpackMetadata(String pack, Path tmpDir) throws IOException {
+    public static Path downloadModpackMetadata(String slug, String fileId, Path tmpDir) throws IOException {
         log("Setting up Metadata");
         Interface.setStatus("Setting up Metadata");
 
-        String url = resolveModpackUrl(pack);
+        String url = fileId == null || fileId.isEmpty()
+                ? resolveModpackUrl(slug)
+                : resolveModpackUrl(slug, fileId);
 
         String zipName = URLDecoder.decode(url.substring(url.lastIndexOf('/') + 1), StandardCharsets.UTF_8.name());
         String extractedName = zipName.replaceAll("\\.zip", "");
@@ -425,17 +427,35 @@ public final class CMPDL {
         }
     }
 
-    private static String resolveModpackUrl(String slug) throws IOException {
+    private static Pack getModpack(String slug) throws IOException {
         URL url = new URL(String.format(META_URL, slug));
         List<String> lines = readLinesFromURL(url);
         if (lines.size() != 1) {
             throw new RuntimeException();
         }
 
-        Optional<Pack> pack = Optional.ofNullable(Pack.ADAPTER.fromJson(String.join("\n", lines)));
-
-        return pack.orElseThrow(RuntimeException::new).getZipDownload().orElseThrow(RuntimeException::new);
+        return Optional.ofNullable(Pack.ADAPTER.fromJson(String.join("\n", lines)))
+                .orElseThrow(() -> new RuntimeException("NO MODPACK FOUND BY '" + slug + "'"));
     }
+
+    private static String resolveModpackUrl(String slug) throws IOException {
+        return getModpack(slug).getZipDownload();
+    }
+
+    private static String resolveModpackUrl(String slug, String fileId) throws IOException {
+        Integer modpackId = getModpack(slug).getModpackId();
+
+        URL url = new URL(String.format(MOD_URL, modpackId.toString(), fileId));
+        List<String> lines = readLinesFromURL(url);
+        if (lines.size() != 1) {
+            throw new RuntimeException();
+        }
+
+        Optional<Addon> addon = Optional.ofNullable(Addon.ADAPTER.fromJson(String.join("\n", lines)));
+
+        return addon.orElseThrow(RuntimeException::new).data.downloadUrl;
+    }
+
 
     private static Addon resolveModUrl(int project, int version) throws IOException {
         URL url = new URL(String.format(MOD_URL, project, version));
