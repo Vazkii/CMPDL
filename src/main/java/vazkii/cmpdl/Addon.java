@@ -11,18 +11,41 @@ public class Addon {
 
     public static final JsonAdapter<Addon> ADAPTER = new Moshi.Builder().build().adapter(Addon.class);
 
-    public int id;
-    public String displayName;
-    public String fileName;
-    public List<Module> modules;
-    public String downloadUrl;
+    public static class Module {
+        public String name;
+    }
+
+    public static class Data {
+        public int id;
+        public String displayName;
+        public String fileName;
+        public List<Module> modules;
+        public String downloadUrl;
+
+        @Override
+        public String toString() {
+            return "Addon{" +
+                    "id=" + id +
+                    ", displayName='" + displayName + '\'' +
+                    ", downloadUrl='" + downloadUrl + '\'' +
+                    '}';
+        }
+
+        public int getId() {
+            return id;
+        }
+    }
+
+    public Data data;
+
+
 
     public String guessInstallDir() {
-        Set<String> folderNames = modules.stream()
-                .map(m -> m.foldername)
+        Set<String> folderNames = data.modules.stream()
+                .map(m -> m.name)
                 .collect(Collectors.toSet());
 
-        if (fileName.endsWith(".zip")
+        if (data.fileName.endsWith(".zip")
                 && folderNames.contains("assets")
                 && folderNames.contains("pack.mcmeta")) {
             return "resourcepacks";
@@ -30,19 +53,7 @@ public class Addon {
         return "mods";
     }
 
-    @Override
-    public String toString() {
-        return "Addon{" +
-                "id=" + id +
-                ", displayName='" + displayName + '\'' +
-                ", downloadUrl='" + downloadUrl + '\'' +
-                '}';
-    }
 
-    public static class Module {
 
-        public String foldername;
-        public long fingerprint;
 
-    }
 }

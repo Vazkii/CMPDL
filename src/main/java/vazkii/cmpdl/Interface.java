@@ -77,15 +77,17 @@ public class Interface {
         JPanel panel;
         JPanel downloadPanel;
         JPanel urlPanel;
-        JPanel versionPanel;
+        JPanel tokenPanel;
         JPanel statusPanel;
         JButton downloadButton;
         JLabel orLabel;
         JButton chooseFileButton;
         JFileChooser fileChooser;
         JLabel urlLabel;
+        JLabel apiTokenLabel;
         JScrollPane scrollPane;
         JTextField urlField;
+        JTextField apiTokenField;
         JTextArea logArea;
         JLabel currentStatus;
         JButton clearButton;
@@ -102,8 +104,8 @@ public class Interface {
             downloadPanel.setMaximumSize(new Dimension(1000, 100));
             urlPanel = new JPanel();
             urlPanel.setLayout(new BoxLayout(urlPanel, BoxLayout.PAGE_AXIS));
-            versionPanel = new JPanel();
-            versionPanel.setLayout(new BoxLayout(versionPanel, BoxLayout.PAGE_AXIS));
+            tokenPanel = new JPanel();
+            tokenPanel.setLayout(new BoxLayout(tokenPanel, BoxLayout.PAGE_AXIS));
             statusPanel = new JPanel();
             downloadButton = new JButton("Download");
             downloadButton.setAlignmentX(CENTER_ALIGNMENT);
@@ -114,6 +116,8 @@ public class Interface {
             fileChooser = new JFileChooser();
             urlLabel = new JLabel("Modpack URL :");
             urlField = new JTextField("", 68);
+            apiTokenLabel = new JLabel("API Token :");
+            apiTokenField = new JTextField("", 68);
 
             logArea = new JTextArea(34, 68);
             logArea.setBackground(Color.WHITE);
@@ -146,8 +150,14 @@ public class Interface {
             urlPanel.add(urlField);
             urlPanel.setBorder(BorderFactory.createEmptyBorder(10, 10, 10, 10));
 
+            tokenPanel.add(apiTokenLabel);
+            tokenPanel.add(Box.createRigidArea(new Dimension(20, 5)));
+            tokenPanel.add(apiTokenField);
+            tokenPanel.setBorder(BorderFactory.createEmptyBorder(10, 10, 10, 10));
+
+
             downloadPanel.add(urlPanel);
-            downloadPanel.add(versionPanel);
+            downloadPanel.add(tokenPanel);
             panel.add(downloadPanel);
             panel.add(downloadButton);
             panel.add(orLabel);
@@ -184,14 +194,35 @@ public class Interface {
         }
 
         @Override
-        public void keyTyped(KeyEvent e) {
-            /*if (e.getKeyChar() == '\n') {
-                actionPerformed(null);
-            }*/
+        public void keyTyped(KeyEvent e) {}
+
+        private String getApiToken() {
+            String token = apiTokenField.getText();
+
+            int tryCounter = 0;
+            while (token.isEmpty()) {
+                if (tryCounter > 3) {
+                    break;
+                }
+
+                token = JOptionPane.showInputDialog(frame, "You must enter your Curseforge API TOKEN");
+                apiTokenField.setText(token);
+
+                tryCounter++;
+            }
+
+            return token;
         }
 
         @Override
         public void actionPerformed(ActionEvent e) {
+            CMPDL.apiToken = getApiToken();
+
+            if (CMPDL.apiToken.isEmpty()) {
+                addLogLine("You must enter your Curseforge API TOKEN\nRegister here: https://console.curseforge.com/?#/signup\nCopy Token from here: https://console.curseforge.com/#/api-keys");
+                return;
+            }
+
             if (e.getSource() == downloadButton) {
                 boolean downloading = CMPDL.downloading;
                 if (downloading && operatorThread != null) {
