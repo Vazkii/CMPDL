@@ -228,7 +228,7 @@ public final class CMPDL {
         }
 
         log("Unzipping file");
-        try (FileSystem zipFs = FileSystems.newFileSystem(zipFile, null)) {
+        try (FileSystem zipFs = FileSystems.newFileSystem(zipFile, (ClassLoader) null)) {
             List<Path> roots = new ArrayList<>();
             zipFs.getRootDirectories().forEach(roots::add);
 
