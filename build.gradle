@@ -11,6 +11,9 @@ wrapper {
     gradleVersion '7.4'
 }
 
+java {
+    sourceCompatibility = targetCompatibility = JavaVersion.VERSION_1_8
+}
 
 repositories {
     mavenCentral()
@@ -23,5 +26,3 @@ dependencies {
 application {
     mainClass = 'vazkii.cmpdl.CMPDL'
 }
-sourceCompatibility = JavaVersion.VERSION_1_9
-targetCompatibility = JavaVersion.VERSION_1_9

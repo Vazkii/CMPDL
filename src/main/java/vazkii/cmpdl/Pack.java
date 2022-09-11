@@ -43,15 +43,18 @@ public class Pack {
 
     public String getZipDownload() {
         if (pagination.resultCount > 1) {
-            throw new RuntimeException("MORE THEN 1 MODPACK FOUND BY PROVIDED SLUG");
+            throw new RuntimeException("MORE THAN 1 MODPACK FOUND BY PROVIDED SLUG");
         }
 
-        return getData().latestFiles.stream()
+        Optional<String> stringOptional = getData().latestFiles.stream()
                 .max(Comparator.comparing(Addon.Data::getId))
-                .map(s -> s.downloadUrl)
-                .stream()
-                .findFirst()
-                .orElseThrow(RuntimeException::new);
+                .map(s -> s.downloadUrl);
+
+        if (!stringOptional.isPresent()) {
+            throw new RuntimeException("NO DOWNLOAD URL FOUND");
+        }
+
+        return stringOptional.get();
     }
 
     public Integer getModpackId() {
