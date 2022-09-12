@@ -1,0 +1,28 @@
+plugins {
+    id 'java'
+    id 'application'
+    id 'com.github.johnrengelman.shadow' version '7.1.2'
+}
+
+group 'vazkii'
+version '1.4.0'
+
+wrapper {
+    gradleVersion '7.4'
+}
+
+java {
+    sourceCompatibility = targetCompatibility = JavaVersion.VERSION_1_8
+}
+
+repositories {
+    mavenCentral()
+}
+
+dependencies {
+    implementation 'com.squareup.moshi:moshi:1.14.0'
+}
+
+application {
+    mainClass = 'vazkii.cmpdl.CMPDL'
+}

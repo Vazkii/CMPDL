@@ -1,0 +1,54 @@
+name: Gradle Build
+
+on:
+  push:
+    branches: [ fix ]
+  pull_request:
+    branches: [ fix ]
+
+jobs:
+  build:
+
+    strategy:
+      matrix:
+        os: [ ubuntu-latest, windows-latest, macos-latest ]
+        java-version: [ 8, 11, 17 ]
+        distribution: [ adopt ]
+
+    runs-on: ${{ matrix.os }}
+
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v3
+
+      - name: Validate Gradle Wrapper
+        uses: gradle/wrapper-validation-action@v1
+
+      - name: Grant execute permission for gradlew
+        run: chmod +x gradlew
+
+      - name: Setup Java
+        uses: actions/setup-java@v3
+        with:
+          java-version: ${{ matrix.java-version }}
+          distribution: ${{ matrix.distribution }}
+
+      - name: Load Cache
+        uses: actions/cache@v3
+        with:
+          path: |
+            ~/.gradle/caches
+            ~/.gradle/wrapper
+          key: ${{ runner.os }}-gradle-${{ hashFiles('**/*.gradle*', '**/gradle-wrapper.properties') }}
+          restore-keys: |
+            ${{ runner.os }}-gradle-
+
+      - name: Build with Gradle
+        run: ./gradlew build
+
+      - name: Save Test Reports
+        uses: actions/upload-artifact@v3
+        if: always()
+        with:
+          name: test-reports-${{ matrix.os }}-${{ matrix.java-version }}-${{ matrix.distribution }}
+          path: build/reports
